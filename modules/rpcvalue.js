@@ -161,5 +161,5 @@ RpcValue.prototype.toChainPack = function()
 
 RpcValue.prototype.isValid = function()
 {
-	return this.value && this.type;
+	return (this.value || this.value === '') && this.type;
 }
