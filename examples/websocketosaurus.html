@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebSocketoSaurus</title>
+		<meta charset="utf-8">
+		<script type="text/javascript" src="../rpcvalue.js"></script>
+		<script type="text/javascript" src="../cpcontext.js"></script>
+		<script type="text/javascript" src="../chainpack.js"></script>
+		<script type="text/javascript" src="../cpon.js"></script>
+		<script type="text/javascript" src="../bint.js"></script>
+		<script type="text/javascript" src="../rpcmessage.js"></script>
+		<script type="text/javascript" src="../ws_client.js"></script>
+	</head>
+	<body>
+		<h1>WebSocketoSaurus</h1>
+		<h2>WebSocket Shv Broker test Client</h1>
+		<p>
+			Uri <input type="text" id="edUri" style="width:50em;"/>
+		</p>
+		<p>
+			user <input type="text" id="edUser"/>
+			password <input type="password" id="edPassword"/>
+		</p>
+		<p>
+			<button onClick="initWebSocket(true);">Connect ChainPack</button>
+			<button onClick="initWebSocket(false);">Connect Cpon</button>
+			<button onClick="stopWebSocket();">Disconnect</button>
+		</p>
+		<p>
+			<input type="text" id="edShvPath" onkeydown="if(event.keyCode==13)sendMessage();"/>
+			<input type="text" id="edMethod" onkeydown="if(event.keyCode==13)sendMessage();"/>
+			<input type="text" id="edParams" onkeydown="if(event.keyCode==13)sendMessage();"/>
+			<button onClick="sendMessage();">Send</button>
+		</p>
+		<p>
+			<textarea id="txtResult" style="width:50em;height:100px;"></textarea>
+		</p>
+		<p>
+			<textarea id="txtLog" style="width:50em;height:200px;"></textarea>
+		</p>
+
+		<script type="text/javascript" src="websocketosaurus.js" ></script>
+	</body>
+</html>
