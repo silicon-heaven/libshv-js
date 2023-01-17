@@ -29,7 +29,7 @@ class WsClient {
 		this.requestHandler = options.requestHandler || (() => {});
 		this.isUseCpon = options.isUseCpon || false;
 		this.logDebug = options.logDebug || (() => {});
-		this.mountPoint = options.mountPoint || "test/websocketosaurus";
+		this.mountPoint = options.mountPoint;
 
 		checkOption(options.user, "user", "string");
 		this.user = options.user;
@@ -48,7 +48,7 @@ class WsClient {
 		this.websocket.onopen = () => {
 			this.logDebug("CONNECTED");
 			this.callRpcMethod(null, "hello").then(() => {
-				const params = `{"login":{"password":"${this.password}","type":"PLAIN","user":"${this.user}"},"options":{"device":{"mountPoint":"${this.mountPoint}"},"idleWatchDogTimeOut": 60}}`;
+				const params = `{"login":{"password":"${this.password}","type":"PLAIN","user":"${this.user}"},"options":{"device":{${typeof this.mountPoint === "string" ? `"mountPoint":"${this.mountPoint}"` : ""} },"idleWatchDogTimeOut": 60}}`;
 				return this.callRpcMethod(null, "login", params);
 			}).then(() => {
 				this.logDebug("SUCCESS: connected to shv broker");
