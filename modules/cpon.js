@@ -79,6 +79,11 @@ CponReader.prototype.skipWhiteIsignificant = function()
 	const LF = '\n'.charCodeAt(0);
 	const KEY_DELIM = ':'.charCodeAt(0);
 	const FIELD_DELIM = ','.charCodeAt(0);
+	// BOM characters
+  	const B = 239
+  	const O = 187
+  	const M = 191
+
 	while(true) {
 		let b = this.ctx.peekByte();
 		if(b < 1)
@@ -111,6 +116,19 @@ CponReader.prototype.skipWhiteIsignificant = function()
 				}
 			}
 			else if(b === KEY_DELIM) {
+				this.ctx.getByte();
+				continue;
+			}
+			// skip BOM characters
+			else if(b === B) {
+				this.ctx.getByte();
+				continue;
+			}
+			else if(b === O) {
+				this.ctx.getByte();
+				continue;
+			}
+			else if(b === M) {
 				this.ctx.getByte();
 				continue;
 			}
