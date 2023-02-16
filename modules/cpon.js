@@ -79,10 +79,6 @@ CponReader.prototype.skipWhiteIsignificant = function()
 	const LF = '\n'.charCodeAt(0);
 	const KEY_DELIM = ':'.charCodeAt(0);
 	const FIELD_DELIM = ','.charCodeAt(0);
-	// BOM characters
-  	const B = 239
-  	const O = 187
-  	const M = 191
 
 	while(true) {
 		let b = this.ctx.peekByte();
