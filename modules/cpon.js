@@ -119,16 +119,7 @@ CponReader.prototype.skipWhiteIsignificant = function()
 				this.ctx.getByte();
 				continue;
 			}
-			// skip BOM characters
-			else if(b === B) {
-				this.ctx.getByte();
-				continue;
-			}
-			else if(b === O) {
-				this.ctx.getByte();
-				continue;
-			}
-			else if(b === M) {
+			else if(b > 127) {
 				this.ctx.getByte();
 				continue;
 			}
