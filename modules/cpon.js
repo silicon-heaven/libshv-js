@@ -79,6 +79,7 @@ CponReader.prototype.skipWhiteIsignificant = function()
 	const LF = '\n'.charCodeAt(0);
 	const KEY_DELIM = ':'.charCodeAt(0);
 	const FIELD_DELIM = ','.charCodeAt(0);
+
 	while(true) {
 		let b = this.ctx.peekByte();
 		if(b < 1)
@@ -111,6 +112,10 @@ CponReader.prototype.skipWhiteIsignificant = function()
 				}
 			}
 			else if(b === KEY_DELIM) {
+				this.ctx.getByte();
+				continue;
+			}
+			else if(b > 127) {
 				this.ctx.getByte();
 				continue;
 			}
