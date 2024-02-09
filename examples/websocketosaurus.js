@@ -1,7 +1,7 @@
 //document.getElementById("edUri").value = "wss://nirvana.elektroline.cz:3778";
 document.getElementById("edUri").value = "wss://localhost:3778";
-document.getElementById("edUser").value = "iot";
-document.getElementById("edPassword").value = "lub42DUB";
+document.getElementById("edUser").value = "user";
+document.getElementById("edPassword").value = "pwd";
 
 document.getElementById("edShvPath").value = ".broker/app";
 document.getElementById("edMethod").value = "echo";
