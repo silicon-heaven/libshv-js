@@ -1,5 +1,5 @@
 "use strict"
-import RpcValue from "./rpcvalue"
+import RpcValue from "./rpcvalue.ts"
 
 function RpcMessage(rpc_val)
 {

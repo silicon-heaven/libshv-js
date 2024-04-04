@@ -1,6 +1,6 @@
 "use strict"
-import RpcValue from "./rpcvalue"
-import {PackContext} from "./cpcontext"
+import RpcValue from "./rpcvalue.ts"
+import {PackContext} from "./cpcontext.ts"
 
 function Cpon()
 {
