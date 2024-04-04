@@ -1,8 +1,8 @@
-import {ChainPack, ChainPackReader, ChainPackWriter} from "./chainpack.js"
-import {Cpon, CponReader} from "./cpon.js"
-import {UnpackContext} from "./cpcontext.js"
-import RpcMessage from "./rpcmessage.js"
-import RpcValue from "./rpcvalue.js"
+import {ChainPack, ChainPackReader, ChainPackWriter} from "./chainpack"
+import {Cpon, CponReader} from "./cpon"
+import {UnpackContext} from "./cpcontext"
+import RpcMessage from "./rpcmessage"
+import RpcValue from "./rpcvalue"
 const dataToRpcValue = (buff) => {
 	let rd = new ChainPackReader(new UnpackContext(buff));
 	rd.readUIntData()

@@ -1,8 +1,8 @@
 "use strict"
-import BInt from "./bint.js"
-import {Cpon} from "./cpon.js"
-import RpcValue from "./rpcvalue.js"
-import {UnpackContext, PackContext} from "./cpcontext.js"
+import BInt from "./bint"
+import {Cpon} from "./cpon"
+import RpcValue from "./rpcvalue"
+import {UnpackContext, PackContext} from "./cpcontext"
 
 function ChainPack()
 {

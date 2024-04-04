@@ -1,6 +1,6 @@
 "use strict"
-import RpcValue from "./rpcvalue.js"
-import {PackContext} from "./cpcontext.js"
+import RpcValue from "./rpcvalue"
+import {PackContext} from "./cpcontext"
 
 function Cpon()
 {

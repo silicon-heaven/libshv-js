@@ -1,7 +1,7 @@
 "use strict"
-import {UnpackContext} from "./cpcontext.js"
-import {Cpon, CponReader, CponWriter} from "./cpon.js"
-import {ChainPackReader, ChainPackWriter} from "./chainpack.js"
+import {UnpackContext} from "./cpcontext"
+import {Cpon, CponReader, CponWriter} from "./cpon"
+import {ChainPackReader, ChainPackWriter} from "./chainpack"
 
 function RpcValue(value, meta, type)
 {
