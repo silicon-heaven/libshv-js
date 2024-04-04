@@ -147,3 +147,5 @@ BInt.prototype.toNumber = function()
 	}
 	return num;
 }
+
+export default BInt;

@@ -1,4 +1,5 @@
 "use strict"
+import RpcValue from "./rpcvalue.js"
 
 class Test
 {

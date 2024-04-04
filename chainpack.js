@@ -1,4 +1,8 @@
 "use strict"
+import BInt from "./bint.js"
+import {Cpon} from "./cpon.js"
+import RpcValue from "./rpcvalue.js"
+import {UnpackContext, PackContext} from "./cpcontext.js"
 
 function ChainPack()
 {
@@ -554,3 +558,5 @@ ChainPackWriter.prototype.writeDateTime = function(dt)
 	bi.resize(ChainPackWriter.bytesNeeded(bitcnt));
 	this.writeUIntDataHelper(bi);
 }
+
+export {ChainPack, ChainPackReader, ChainPackWriter};

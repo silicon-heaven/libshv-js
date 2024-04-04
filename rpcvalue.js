@@ -1,4 +1,7 @@
 "use strict"
+import {UnpackContext} from "./cpcontext.js"
+import {Cpon, CponReader, CponWriter} from "./cpon.js"
+import {ChainPackReader, ChainPackWriter} from "./chainpack.js"
 
 function RpcValue(value, meta, type)
 {
@@ -158,3 +161,5 @@ RpcValue.prototype.isValid = function()
 {
 	return (this.value || this.value === '') && this.type;
 }
+
+export default RpcValue;

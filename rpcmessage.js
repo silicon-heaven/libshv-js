@@ -1,4 +1,5 @@
 "use strict"
+import RpcValue from "./rpcvalue.js"
 
 function RpcMessage(rpc_val)
 {
@@ -58,3 +59,5 @@ RpcMessage.prototype.setError = function(err) {return this.rpcValue.value[RpcMes
 RpcMessage.prototype.toString = function() {return this.isValid()? this.rpcValue.toString(): ""; }
 RpcMessage.prototype.toCpon = function() {return this.isValid()? this.rpcValue.toCpon(): ""; }
 RpcMessage.prototype.toChainPack = function() {return this.isValid()? this.rpcValue.toChainPack(): ""; }
+
+export default RpcMessage;

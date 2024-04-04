@@ -103,3 +103,5 @@ PackContext.prototype.buffer = function()
 {
 	return this.data.buffer.slice(0, this.length)
 }
+
+export {PackContext, UnpackContext};
