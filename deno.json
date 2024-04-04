@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "module": "es2021",
-    "lib": ["dom", "deno.window"]
+    "lib": ["dom", "dom.iterable", "deno.window"]
   }
 }

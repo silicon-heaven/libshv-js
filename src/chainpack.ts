@@ -1,562 +1,528 @@
-"use strict"
-import BInt from "./bint.ts"
-import {Cpon} from "./cpon.ts"
-import RpcValue from "./rpcvalue.ts"
-import {UnpackContext, PackContext} from "./cpcontext.ts"
+import BInt from './bint.ts';
+import {utf8ToString} from './cpon.ts';
+import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
+import {UnpackContext, PackContext} from './cpcontext.ts';
 
-function ChainPack()
-{
+enum PackingSchema {
+    IntThreshold = 64,
+    Null = 128,
+    UInt = 129,
+    Int = 130,
+    Double = 131,
+    Bool = 132,
+    Blob = 133,
+    String = 134,
+    List = 136,
+    Map = 137,
+    IMap = 138,
+    MetaMap = 139,
+    Decimal = 140,
+    DateTime = 141,
+    CString = 142,
+    False = 253,
+    True = 254,
+    Term = 255,
 }
 
-ChainPack.ProtocolType = 1;
-
-ChainPack.CP_Null = 128;
-ChainPack.CP_UInt = 129;
-ChainPack.CP_Int = 130;
-ChainPack.CP_Double = 131;
-ChainPack.CP_Bool = 132;
-ChainPack.CP_Blob = 133;
-ChainPack.CP_String = 134;
-//ChainPack.CP_DateTimeEpoch_depr; // deprecated
-ChainPack.CP_List = 136;
-ChainPack.CP_Map = 137;
-ChainPack.CP_IMap = 138;
-ChainPack.CP_MetaMap = 139;
-ChainPack.CP_Decimal = 140;
-ChainPack.CP_DateTime = 141;
-ChainPack.CP_CString = 142;
-ChainPack.CP_FALSE = 253;
-ChainPack.CP_TRUE = 254;
-ChainPack.CP_TERM = 255;
-
-// UTC msec since 2.2. 2018
-// Fri Feb 02 2018 00:00:00 == 1517529600 EPOCH
-ChainPack.SHV_EPOCH_MSEC = 1517529600000;
-ChainPack.INVALID_MIN_OFFSET_FROM_UTC = (-64 * 15);
-
-ChainPack.isLittleEndian = (function() {
-	let buffer = new ArrayBuffer(2);
-	new DataView(buffer).setInt16(0, 256, true /* littleEndian */);
-	// Int16Array uses the platform's endianness.
-	return new Int16Array(buffer)[0] === 256;
-})();
-
-function ChainPackReader(unpack_context)
-{
-	if(unpack_context instanceof ArrayBuffer)
-		unpack_context = new UnpackContext(unpack_context)
-	else if(unpack_context instanceof Uint8Array)
-		unpack_context = new UnpackContext(unpack_context)
-	if(!(unpack_context instanceof UnpackContext))
-		throw new TypeError("ChainpackReader must be constructed with UnpackContext")
-	this.ctx = unpack_context;
-}
-
-ChainPackReader.prototype.read = function()
-{
-	let rpc_val = new RpcValue();
-	let packing_schema = this.ctx.getByte();
-
-	if(packing_schema == ChainPack.CP_MetaMap) {
-		rpc_val.meta = this.readMap();
-		packing_schema = this.ctx.getByte();
-	}
-
-	if(packing_schema < 128) {
-		if(packing_schema & 64) {
-			// tiny Int
-			rpc_val.type = RpcValue.Type.Int;
-			rpc_val.value = packing_schema & 63;
-		}
-		else {
-			// tiny UInt
-			rpc_val.type = RpcValue.Type.UInt;
-			rpc_val.value = packing_schema & 63;
-		}
-	}
-	else {
-		switch(packing_schema) {
-		case ChainPack.CP_Null: {
-			rpc_val.type = RpcValue.Type.Null;
-			rpc_val.value = null;
-			break;
-		}
-		case ChainPack.CP_TRUE: {
-			rpc_val.type = RpcValue.Type.Bool;
-			rpc_val.value = true;
-			break;
-		}
-		case ChainPack.CP_FALSE: {
-			rpc_val.type = RpcValue.Type.Bool;
-			rpc_val.value = false;
-			break;
-		}
-		case ChainPack.CP_Int: {
-			rpc_val.value = this.readIntData()
-			rpc_val.type = RpcValue.Type.Int;
-			break;
-		}
-		case ChainPack.CP_UInt: {
-			rpc_val.value = this.readUIntData()
-			rpc_val.type = RpcValue.Type.UInt;
-			break;
-		}
-		case ChainPack.CP_Double: {
-			let data = new Uint8Array(8);
-			for (var i = 0; i < 8; i++)
-				data[i] = this.ctx.getByte();
-			rpc_val.value = new DataView(data.buffer).getFloat64(0, true); //little endian
-			rpc_val.type = RpcValue.Type.Double;
-			break;
-		}
-		case ChainPack.CP_Decimal: {
-			let mant = this.readIntData();
-			let exp = this.readIntData();
-			rpc_val.value = {mantisa: mant, exponent: exp};
-			rpc_val.type = RpcValue.Type.Decimal;
-			break;
-		}
-		case ChainPack.CP_DateTime: {
-			let bi = this.readUIntDataHelper();
-			let lsb = bi.val[bi.val.length - 1]
-			let has_tz_offset = lsb & 1;
-			let has_not_msec = lsb & 2;
-			bi.signedRightShift(2);
-			lsb = bi.val[bi.val.length - 1]
-
-			let offset = 0;
-			if(has_tz_offset) {
-				offset = lsb & 0x7F;
-				if(offset & 0x40) {
-					// sign extension
-					offset = offset - 128;
-				}
-				bi.signedRightShift(7);
-			}
-			offset *= 15;
-			if(offset == ChainPack.INVALID_MIN_OFFSET_FROM_UTC) {
-				rpc_val.value = null;
-			}
-			else {
-				let msec = bi.toNumber();
-				if(has_not_msec)
-					msec *= 1000;
-				msec += ChainPack.SHV_EPOCH_MSEC;
-
-				rpc_val.value = {epochMsec: msec, utcOffsetMin: offset};
-			}
-			rpc_val.type = RpcValue.Type.DateTime;
-			break;
-		}
-		case ChainPack.CP_Map: {
-			rpc_val.value = this.readMap();
-			rpc_val.type = RpcValue.Type.Map;
-			break;
-		}
-		case ChainPack.CP_IMap: {
-			rpc_val.value = this.readMap();
-			rpc_val.type = RpcValue.Type.IMap;
-			break;
-		}
-		case ChainPack.CP_List: {
-			rpc_val.value = this.readList();
-			rpc_val.type = RpcValue.Type.List;
-			break;
-		}
-		case ChainPack.CP_Blob: {
-			let str_len = this.readUIntData();
-			let arr = new Uint8Array(str_len)
-			for (var i = 0; i < str_len; i++)
-				arr[i] = this.ctx.getByte()
-			rpc_val.value = arr.buffer;
-			rpc_val.type = RpcValue.Type.Blob;
-			break;
-		}
-		case ChainPack.CP_String: {
-			let str_len = this.readUIntData();
-			let arr = new Uint8Array(str_len)
-			for (var i = 0; i < str_len; i++)
-				arr[i] = this.ctx.getByte()
-			rpc_val.value = Cpon.utf8ToString(arr.buffer);
-			rpc_val.type = RpcValue.Type.String;
-			break;
-		}
-		case ChainPack.CP_CString:
-		{
-			// variation of CponReader.readCString()
-			let pctx = new PackContext();
-			while(true) {
-				let b = this.ctx.getByte();
-				if(b == '\\'.charCodeAt(0)) {
-					b = this.ctx.getByte();
-					switch (b) {
-					case '\\'.charCodeAt(0): pctx.putByte("\\"); break;
-					case '0'.charCodeAt(0): pctx.putByte(0); break;
-					default: pctx.putByte(b); break;
-					}
-				}
-				else {
-					if (b == 0) {
-						// end of string
-						break;
-					}
-					else {
-						pctx.putByte(b);
-					}
-				}
-			}
-			rpc_val.value = Cpon.utf8ToString(pctx.buffer());
-			rpc_val.type = RpcValue.Type.String;
-			break;
-		}
-		default:
-			throw new TypeError("ChainPack - Invalid type info: " + packing_schema);
-		}
-	}
-	return rpc_val;
-}
-
-ChainPackReader.prototype.readUIntDataHelper = function()
-{
-	let num = 0;
-	let head = this.ctx.getByte();
-	let bytes_to_read_cnt;
-	if     ((head & 128) === 0) {bytes_to_read_cnt = 0; num = head & 127;}
-	else if((head &  64) === 0) {bytes_to_read_cnt = 1; num = head & 63;}
-	else if((head &  32) === 0) {bytes_to_read_cnt = 2; num = head & 31;}
-	else if((head &  16) === 0) {bytes_to_read_cnt = 3; num = head & 15;}
-	else {
-		bytes_to_read_cnt = (head & 0xf) + 4;
-	}
-	let bytes = new Uint8Array(bytes_to_read_cnt + 1)
-	bytes[0] = num;
-	for (let i=0; i < bytes_to_read_cnt; i++) {
-		let r = this.ctx.getByte();
-		bytes[i + 1] = r;
-	}
-	return new BInt(bytes)
-}
-
-ChainPackReader.prototype.readUIntData = function()
-{
-	let bi = this.readUIntDataHelper();
-	return bi.toNumber();
-}
-
-ChainPackReader.prototype.readIntData = function()
-{
-	let bi = this.readUIntDataHelper();
-	let is_neg;
-	if(bi.byteCount() < 5) {
-		let sign_mask = 0x80 >> bi.byteCount();
-		is_neg = bi.val[0] & sign_mask;
-		bi.val[0] &= ~sign_mask;
-	}
-	else {
-		is_neg = bi.val[1] & 128;
-		bi.val[1] &= ~128;
-	}
-	let num = bi.toNumber();
-	if(is_neg)
-		num = -num;
-	return num;
-}
-
-ChainPackReader.prototype.readList = function()
-{
-	let lst = []
-	while(true) {
-		let b = this.ctx.peekByte();
-		if(b == ChainPack.CP_TERM) {
-			this.ctx.getByte();
-			break;
-		}
-		let item = this.read()
-		lst.push(item);
-	}
-	return lst;
-}
-
-ChainPackReader.prototype.readMap = function()
-{
-	let map = {}
-	while(true) {
-		let b = this.ctx.peekByte();
-		if(b == ChainPack.CP_TERM) {
-			this.ctx.getByte();
-			break;
-		}
-		let key = this.read()
-		if(!key.isValid())
-			throw new TypeError("Malformed map, invalid key");
-		let val = this.read()
-		if(key.type === RpcValue.Type.String)
-			map[key.toString()] = val;
-		else
-			map[key.toInt()] = val;
-	}
-	return map;
-}
-
-function ChainPackWriter()
-{
-	this.ctx = new PackContext();
-}
-
-ChainPackWriter.prototype.write = function(rpc_val)
-{
-	if(!(rpc_val && rpc_val instanceof RpcValue))
-		rpc_val = new RpcValue(rpc_val)
-	if(rpc_val && rpc_val instanceof RpcValue) {
-		if(rpc_val.meta) {
-			this.writeMeta(rpc_val.meta);
-		}
-		switch (rpc_val.type) {
-		case RpcValue.Type.Null: this.ctx.putByte(ChainPack.CP_Null); break;
-		case RpcValue.Type.Bool: this.ctx.putByte(rpc_val.value? ChainPack.CP_TRUE: ChainPack.CP_FALSE); break;
-		case RpcValue.Type.String: this.writeJSString(rpc_val.value); break;
-		case RpcValue.Type.Blob: this.writeBlob(rpc_val.value); break;
-		case RpcValue.Type.UInt: this.writeUInt(rpc_val.value); break;
-		case RpcValue.Type.Int: this.writeInt(rpc_val.value); break;
-		case RpcValue.Type.Double: this.writeDouble(rpc_val.value); break;
-		case RpcValue.Type.Decimal: this.writeDecimal(rpc_val.value); break;
-		case RpcValue.Type.List: this.writeList(rpc_val.value); break;
-		case RpcValue.Type.Map: this.writeMap(rpc_val.value); break;
-		case RpcValue.Type.IMap: this.writeIMap(rpc_val.value); break;
-		case RpcValue.Type.DateTime: this.writeDateTime(rpc_val.value); break;
-		default:
-			// better to write null than create invalid chain-pack
-			this.ctx.putByte(ChainPack.CP_Null);
-			break;
-		}
-	}
-}
-
-//ChainPackWriter.MAX_BIT_LEN = Math.log(Number.MAX_SAFE_INTEGER) / Math.log(2);
-// logcal operator in JS works on 32 bit only
-ChainPackWriter.MAX_BIT_LEN = 32;
-	/*
-	 0 ...  7 bits  1  byte  |0|s|x|x|x|x|x|x|<-- LSB
-	 8 ... 14 bits  2  bytes |1|0|s|x|x|x|x|x| |x|x|x|x|x|x|x|x|<-- LSB
-	15 ... 21 bits  3  bytes |1|1|0|s|x|x|x|x| |x|x|x|x|x|x|x|x| |x|x|x|x|x|x|x|x|<-- LSB
-	22 ... 28 bits  4  bytes |1|1|1|0|s|x|x|x| |x|x|x|x|x|x|x|x| |x|x|x|x|x|x|x|x| |x|x|x|x|x|x|x|x|<-- LSB
-	29+       bits  5+ bytes |1|1|1|1|n|n|n|n| |s|x|x|x|x|x|x|x| |x|x|x|x|x|x|x|x| |x|x|x|x|x|x|x|x| ... <-- LSB
-											n ==  0 ->  4 bytes number (32 bit number)
-											n ==  1 ->  5 bytes number
-											n == 14 -> 18 bytes number
-											n == 15 -> for future (number of bytes will be specified in next byte)
-	*/
-
-	// return max bit length >= bit_len, which can be encoded by same number of bytes
+const SHV_EPOCH_MSEC = 1_517_529_600_000;
+const INVALID_MIN_OFFSET_FROM_UTC = (-64 * 15);
 
 // number of bytes needed to encode bit_len
-ChainPackWriter.bytesNeeded = function(bit_len)
-{
-	let cnt;
-	if(bit_len <= 28)
-		cnt = ((bit_len - 1) / 7 | 0) + 1;
-	else
-		cnt = ((bit_len - 1) / 8 | 0) + 2;
-	return cnt;
+const bytesNeeded = (bit_len: number) => bit_len <= 28 ? Math.trunc((bit_len - 1) / 7) + 1 : Math.trunc((bit_len - 1) / 8) + 2;
+
+class ChainPackReader {
+    ctx: UnpackContext;
+
+    constructor(data: ArrayBuffer | Uint8Array | UnpackContext) {
+        this.ctx = data instanceof UnpackContext ? data : new UnpackContext(data);
+    }
+
+    read(): RpcValue {
+        let meta: MetaMap | undefined;
+        let codePointAt = this.ctx.getByte() as PackingSchema;
+
+        if (codePointAt === PackingSchema.MetaMap) {
+            meta = this.readMetaMap();
+            codePointAt = this.ctx.getByte();
+        }
+
+        const impl_return = (x: RpcValueType) => {
+            const ret = meta !== undefined ? new RpcValueWithMetaData(x, meta) : x;
+            return ret;
+        };
+
+        if (codePointAt < PackingSchema.Null) {
+            if (codePointAt >= PackingSchema.IntThreshold) {
+                return impl_return(new Int(codePointAt - 64));
+            }
+            return impl_return(new UInt(codePointAt));
+        }
+        switch (codePointAt) {
+            case PackingSchema.Null: {
+                return impl_return(undefined);
+            }
+            case PackingSchema.True: {
+                return impl_return(true);
+            }
+            case PackingSchema.False: {
+                return impl_return(false);
+            }
+            case PackingSchema.Int: {
+                return impl_return(new Int(this.readIntData()));
+            }
+            case PackingSchema.UInt: {
+                return impl_return(new UInt(this.readUIntData()));
+            }
+            case PackingSchema.Double: {
+                const data = new Uint8Array(8);
+                for (let i = 0; i < 8; i++) {
+                    data[i] = this.ctx.getByte();
+                }
+                return impl_return(new Double(new DataView(data.buffer).getFloat64(0, true))); // little endian
+            }
+            case PackingSchema.Decimal: {
+                const mant = this.readIntData();
+                const exp = this.readIntData();
+                return impl_return(new Decimal(mant, exp));
+            }
+            case PackingSchema.DateTime: {
+                const bi = this.readUIntDataHelper();
+                let lsb = bi.val.at(-1)!;
+                const has_tz_offset = lsb & 1;
+                const has_not_msec = lsb & 2;
+                bi.signedRightShift(2);
+                lsb = bi.val.at(-1)!;
+
+                let offset = 0;
+                if (has_tz_offset) {
+                    offset = lsb & 0x7F;
+                    if (offset & 0x40) {
+                        // sign extension
+                        offset -= 128;
+                    }
+                    bi.signedRightShift(7);
+                }
+
+                offset *= 15;
+
+                if (offset === INVALID_MIN_OFFSET_FROM_UTC) {
+                    return impl_return(undefined);
+                }
+
+                let msec = bi.toNumber();
+                if (has_not_msec) {
+                    msec *= 1000;
+                }
+                msec += SHV_EPOCH_MSEC;
+                msec -= offset * 60_000;
+                return new Date(msec);
+            }
+            case PackingSchema.Map: {
+                return impl_return(this.readMap());
+            }
+            case PackingSchema.IMap: {
+                return impl_return(this.readIMap());
+            }
+            case PackingSchema.List: {
+                return impl_return(this.readList());
+            }
+            case PackingSchema.Blob: {
+                const str_len = this.readUIntData();
+                const arr = new Uint8Array(str_len);
+                for (let i = 0; i < str_len; i++) {
+                    arr[i] = this.ctx.getByte();
+                }
+                return impl_return(arr.buffer);
+            }
+            case PackingSchema.String: {
+                const str_len = this.readUIntData();
+                const arr = new Uint8Array(str_len);
+                for (let i = 0; i < str_len; i++) {
+                    arr[i] = this.ctx.getByte();
+                }
+                return impl_return(utf8ToString(arr.buffer));
+            }
+            case PackingSchema.CString: {
+                // variation of CponReader.readCString()
+                const pctx = new PackContext();
+                while (true) {
+                    let b = this.ctx.getByte();
+                    if (b === '\\'.codePointAt(0)) {
+                        b = this.ctx.getByte();
+                        switch (b) {
+                            case '\\'.codePointAt(0):
+                                pctx.putByte('\\'.codePointAt(0)!);
+                                break;
+                            case '0'.codePointAt(0):
+                                pctx.putByte(0);
+                                break;
+                            default:
+                                pctx.putByte(b);
+                                break;
+                        }
+                    } else if (b === 0) {
+                        // end of string
+                        break;
+                    } else {
+                        pctx.putByte(b);
+                    }
+                }
+                return impl_return(utf8ToString(pctx.buffer()));
+            }
+            default:
+                throw new TypeError('ChainPack - Invalid type info: ' + codePointAt);
+        }
+    }
+
+    readUIntDataHelper() {
+        let num = 0;
+        const head = this.ctx.getByte();
+        let bytes_to_read_cnt;
+        switch (0) {
+            case head & 128: {
+                bytes_to_read_cnt = 0;
+                num = head & 127;
+                break;
+            }
+            case head & 64: {
+                bytes_to_read_cnt = 1;
+                num = head & 63;
+                break;
+            }
+            case head & 32: {
+                bytes_to_read_cnt = 2;
+                num = head & 31;
+                break;
+            }
+            case head & 16: {
+                bytes_to_read_cnt = 3;
+                num = head & 15;
+                break;
+            }
+            default: {
+                bytes_to_read_cnt = (head & 0xF) + 4;
+            }
+        }
+        const bytes = new Uint8Array(bytes_to_read_cnt + 1);
+        bytes[0] = num;
+        for (let i = 0; i < bytes_to_read_cnt; i++) {
+            const r = this.ctx.getByte();
+            bytes[i + 1] = r;
+        }
+        return new BInt(bytes);
+    }
+
+    readIntData() {
+        const bi = this.readUIntDataHelper();
+        let is_neg;
+        if (bi.byteCount() < 5) {
+            const sign_mask = 0x80 >> bi.byteCount();
+            is_neg = bi.val[0] & sign_mask;
+            bi.val[0] &= ~sign_mask;
+        } else {
+            is_neg = bi.val[1] & 128;
+            bi.val[1] &= ~128;
+        }
+        let num = bi.toNumber();
+        if (is_neg) {
+            num = -num;
+        }
+        return num;
+    }
+
+    readUIntData() {
+        return this.readUIntDataHelper().toNumber();
+    }
+
+    readList() {
+        const lst = [];
+        while (true) {
+            const b = this.ctx.peekByte();
+            if (b as PackingSchema === PackingSchema.Term) {
+                this.ctx.getByte();
+                break;
+            }
+            lst.push(this.read());
+        }
+        return lst;
+    }
+
+    readMetaMap() {
+        return this.implReadMap(MetaMap);
+    }
+
+    readMap() {
+        return this.implReadMap(ShvMap);
+    }
+
+    readIMap() {
+        return this.implReadMap(IMap);
+    }
+
+    private implReadMap<MapType extends MetaMap | ShvMap | IMap>(MapTypeCtor: new () => MapType) {
+        const map = new MapTypeCtor();
+        while (true) {
+            const b = this.ctx.peekByte();
+            if (b as PackingSchema === PackingSchema.Term) {
+                this.ctx.getByte();
+                break;
+            }
+            const key = this.read();
+            const val = this.read();
+            if (map instanceof MetaMap && typeof key === 'string') {
+                map.value[key] = val;
+            } else if (map instanceof MetaMap && key instanceof Int) {
+                map.value[Number(key)] = val;
+            } else if (map instanceof ShvMap && typeof key === 'string') {
+                map.value[key] = val;
+            } else if (map instanceof IMap && key instanceof Int) {
+                map.value[Number(key)] = val;
+            } else {
+                throw new TypeError('Malformed map, invalid key');
+            }
+        }
+        return map;
+    }
 }
 
-ChainPackWriter.expandBitLen = function(bit_len)
-{
-	let ret;
-	let byte_cnt = ChainPackWriter.bytesNeeded(bit_len);
-	if(bit_len <= 28) {
-		ret = byte_cnt * (8 - 1) - 1;
-	}
-	else {
-		ret = (byte_cnt - 1) * 8 - 1;
-	}
-	return ret;
+class ChainPackWriter {
+    ctx: PackContext;
+
+    constructor() {
+        this.ctx = new PackContext();
+    }
+
+    write(rpc_val: RpcValue) {
+        if (rpc_val instanceof RpcValueWithMetaData) {
+            this.writeMeta(rpc_val.meta);
+            rpc_val = rpc_val.value;
+        }
+        switch (true) {
+            case rpc_val === undefined:
+                this.ctx.putByte(PackingSchema.Null);
+                break;
+            case typeof rpc_val === 'boolean':
+                this.ctx.putByte(rpc_val ? PackingSchema.True : PackingSchema.False);
+                break;
+            case typeof rpc_val === 'string':
+                this.writeJSString(rpc_val);
+                break;
+            case rpc_val instanceof ArrayBuffer:
+                this.writeBlob(rpc_val);
+                break;
+            case rpc_val instanceof UInt:
+                this.writeUInt(rpc_val);
+                break;
+            case rpc_val instanceof Int:
+                this.writeInt(rpc_val);
+                break;
+            case rpc_val instanceof Decimal:
+                this.writeDecimal(rpc_val);
+                break;
+            case Array.isArray(rpc_val):
+                this.writeList(rpc_val);
+                break;
+            case rpc_val instanceof IMap:
+                this.writeIMap(rpc_val);
+                break;
+            case rpc_val instanceof ShvMap:
+                this.writeMap(rpc_val);
+                break;
+            case rpc_val instanceof Date:
+                this.writeDateTime(rpc_val);
+                break;
+            default:
+                console.log('Can\'t serialize', rpc_val);
+                throw new Error('Can\'t serialize');
+        }
+    }
+
+    writeUIntDataHelper(bint: BInt) {
+        const bytes = bint.val;
+
+        let head = bytes[0];
+        if (bytes.length < 5) {
+            let mask = (0xF0 << (4 - bytes.length)) & 0xFF;
+            head &= ~mask;
+            mask <<= 1;
+            mask &= 0xFF;
+            head |= mask;
+        } else {
+            head = 0xF0 | (bytes.length - 5);
+        }
+
+        this.ctx.putByte(head);
+
+        for (let i = 1; i < bytes.length; ++i) {
+            this.ctx.putByte(bytes[i]);
+        }
+    }
+
+    writeUIntData(num: UInt) {
+        const bi = new BInt(Number(num));
+        const bitcnt = bi.significantBitsCount();
+        bi.resize(bytesNeeded(bitcnt));
+        this.writeUIntDataHelper(bi);
+    }
+
+    writeIntData(snum: number) {
+        const neg = (snum < 0);
+        const num = neg ? -snum : snum;
+        const bi = new BInt(num);
+        const bitcnt = bi.significantBitsCount() + 1;
+        bi.resize(bytesNeeded(bitcnt));
+        if (neg) {
+            if (bi.byteCount() < 5) {
+                const sign_mask = 0x80 >> bi.byteCount();
+                bi.val[0] |= sign_mask;
+            } else {
+                bi.val[1] |= 128;
+            }
+        }
+        this.writeUIntDataHelper(bi);
+    }
+
+    writeInt(n: Int) {
+        if (Number(n) >= 0 && Number(n) < 64) {
+            this.ctx.putByte(Number(n) + 64);
+            return;
+        }
+
+        this.ctx.putByte(PackingSchema.Int);
+        this.writeIntData(Number(n));
+    }
+
+    writeUInt(n: UInt) {
+        if (Number(n) < 64) {
+            this.ctx.putByte(Number(n));
+            return;
+        }
+
+        this.ctx.putByte(PackingSchema.UInt);
+        this.writeUIntData(n);
+    }
+
+    writeJSString(str: string) {
+        this.ctx.putByte(PackingSchema.String);
+        const pctx = new PackContext();
+        pctx.writeStringUtf8(str);
+        this.writeUIntData(new UInt(pctx.length));
+        for (let i = 0; i < pctx.length; i++) {
+            this.ctx.putByte(pctx.data[i]);
+        }
+    }
+
+    writeDecimal(val: Decimal) {
+        this.ctx.putByte(PackingSchema.Decimal);
+        this.writeIntData(val.mantisa);
+        this.writeIntData(val.exponent);
+    }
+
+    writeBlob(blob: ArrayBuffer) {
+        this.ctx.putByte(PackingSchema.Blob);
+        const arr = new Uint8Array(blob);
+        this.writeUIntData(new UInt(arr.length));
+        for (const element of arr) {
+            this.ctx.putByte(element);
+        }
+    }
+
+    writeDateTime(dt: Date) {
+        this.ctx.putByte(PackingSchema.DateTime);
+
+        let msecs = dt.getTime() - SHV_EPOCH_MSEC;
+        if (msecs < 0) {
+            throw new RangeError('DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.');
+        }
+
+        const offset = (dt.getTimezoneOffset() / 15) & 0x7F;
+
+        const ms = msecs % 1000;
+        if (ms === 0) {
+            msecs /= 1000;
+        }
+
+        const bi = new BInt(msecs);
+        if (offset !== 0) {
+            bi.leftShift(7);
+            bi.val[bi.val.length - 1] |= offset;
+        }
+
+        bi.leftShift(2);
+
+        if (offset !== 0) {
+            bi.val[bi.val.length - 1] |= 1;
+        }
+
+        if (ms === 0) {
+            bi.val[bi.val.length - 1] |= 2;
+        }
+
+        // save as signed int
+        const bitcnt = bi.significantBitsCount() + 1;
+        bi.resize(bytesNeeded(bitcnt));
+        this.writeUIntDataHelper(bi);
+    }
+
+    writeList(lst: RpcValue[]) {
+        this.ctx.putByte(PackingSchema.List);
+        for (const element of lst) {
+            this.write(element);
+        }
+        this.ctx.putByte(PackingSchema.Term);
+    }
+
+    writeMeta(map: MetaMap) {
+        this.ctx.putByte(PackingSchema.MetaMap);
+        this.writeMapContent(map);
+    }
+
+    writeIMap(map: IMap) {
+        this.ctx.putByte(PackingSchema.IMap);
+        this.writeMapContent(map);
+    }
+
+    writeMap(map: ShvMap) {
+        this.ctx.putByte(PackingSchema.Map);
+        this.writeMapContent(map);
+    }
+
+    writeMapContent(map: MetaMap | ShvMap | IMap) {
+        for (const [key, value] of Object.entries(map.value)) {
+            if (value === undefined) {
+                continue;
+            }
+
+            if (map instanceof IMap) {
+                const int_key = Number(key);
+                if (Number.isNaN(int_key)) {
+                    throw new TypeError('Invalid NaN IMap key');
+                }
+
+                this.writeInt(new Int(int_key));
+            } else if (map instanceof MetaMap) {
+                const int_key = Number(key);
+                if (Number.isNaN(int_key)) {
+                    this.writeJSString(key.toString());
+                } else {
+                    this.writeInt(new Int(int_key));
+                }
+            } else {
+                this.writeJSString(key.toString());
+            }
+            this.write(value);
+        }
+
+        this.ctx.putByte(PackingSchema.Term);
+    }
 }
 
-ChainPackWriter.prototype.writeUIntDataHelper = function(bint)
-{
-	let bytes = bint.val;
-	//let byte_cnt = bint.byteCount();
+const toChainPack = (value: RpcValue) => {
+    const wr = new ChainPackWriter();
+    wr.write(value);
+    return wr.ctx.buffer();
+};
 
-	let head = bytes[0];
-	if(bytes.length < 5) {
-		let mask = (0xf0 << (4 - bytes.length)) & 0xff;
-		head = head & ~mask;
-		mask <<= 1;
-		mask &= 0xff;
-		head = head | mask;
-	}
-	else {
-		head = 0xf0 | (bytes.length - 5);
-	}
-	this.ctx.putByte(head);
-	for (let i = 1; i < bytes.length; ++i) {
-		let r = bytes[i];
-		this.ctx.putByte(r);
-	}
-}
+const ChainpackProtocolType = 1;
 
-ChainPackWriter.prototype.writeUIntData = function(num)
-{
-	let bi = new BInt(num)
-	let bitcnt = bi.significantBitsCount();
-	bi.resize(ChainPackWriter.bytesNeeded(bitcnt));
-	this.writeUIntDataHelper(bi);
-}
-
-ChainPackWriter.prototype.writeIntData = function(snum)
-{
-	let neg = (snum < 0);
-	let num = neg? -snum: snum;
-	let bi = new BInt(num)
-	let bitcnt = bi.significantBitsCount() + 1;
-	bi.resize(ChainPackWriter.bytesNeeded(bitcnt));
-	if(neg) {
-		if(bi.byteCount() < 5) {
-			let sign_mask = 0x80 >> bi.byteCount();
-			bi.val[0] |= sign_mask;
-		}
-		else {
-			bi.val[1] |= 128;
-		}
-	}
-	this.writeUIntDataHelper(bi);
-}
-
-ChainPackWriter.prototype.writeUInt = function(n)
-{
-	if(n < 64) {
-		this.ctx.putByte(n % 64);
-	}
-	else {
-		this.ctx.putByte(ChainPack.CP_UInt);
-		this.writeUIntData(n);
-	}
-}
-
-ChainPackWriter.prototype.writeInt = function(n)
-{
-	if(n >= 0 && n < 64) {
-		this.ctx.putByte((n % 64) + 64);
-	}
-	else {
-		this.ctx.putByte(ChainPack.CP_Int);
-		this.writeIntData(n);
-	}
-}
-
-ChainPackWriter.prototype.writeDecimal = function(val)
-{
-	this.ctx.putByte(ChainPack.CP_Decimal);
-	this.writeIntData(val.mantisa);
-	this.writeIntData(val.exponent);
-}
-
-ChainPackWriter.prototype.writeList = function(lst)
-{
-	this.ctx.putByte(ChainPack.CP_List);
-	for(let i=0; i<lst.length; i++)
-		this.write(lst[i])
-	this.ctx.putByte(ChainPack.CP_TERM);
-}
-
-ChainPackWriter.prototype.writeMapData = function(map)
-{
-	for (let p in map) {
-		if (map.hasOwnProperty(p)) {
-			let c = p.charCodeAt(0);
-			if(c >= 48 && c <= 57) {
-				this.writeInt(parseInt(p))
-			}
-			else {
-				this.writeJSString(p);
-			}
-			this.write(map[p]);
-		}
-	}
-	this.ctx.putByte(ChainPack.CP_TERM);
-}
-
-ChainPackWriter.prototype.writeMap = function(map)
-{
-	this.ctx.putByte(ChainPack.CP_Map);
-	this.writeMapData(map);
-}
-
-ChainPackWriter.prototype.writeIMap = function(map)
-{
-	this.ctx.putByte(ChainPack.CP_IMap);
-	this.writeMapData(map);
-}
-
-ChainPackWriter.prototype.writeMeta = function(map)
-{
-	this.ctx.putByte(ChainPack.CP_MetaMap);
-	this.writeMapData(map);
-}
-
-ChainPackWriter.prototype.writeBlob = function(blob)
-{
-	this.ctx.putByte(ChainPack.CP_Blob);
-	let arr = new Uint8Array(blob)
-	this.writeUIntData(arr.length)
-	for (let i=0; i < arr.length; i++)
-		this.ctx.putByte(arr[i])
-}
-/*
-ChainPackWriter.prototype.writeUtf8String = function(str)
-{
-	this.ctx.putByte(ChainPack.CP_String);
-	let arr = new Uint8Array(str)
-	this.writeUIntData(arr.length)
-	for (let i=0; i < arr.length; i++)
-		this.ctx.putByte(arr[i])
-}
-*/
-ChainPackWriter.prototype.writeJSString = function(str)
-{
-	this.ctx.putByte(ChainPack.CP_String);
-	let pctx = new PackContext();
-	pctx.writeStringUtf8(str);
-	this.writeUIntData(pctx.length)
-	for (let i=0; i < pctx.length; i++)
-		this.ctx.putByte(pctx.data[i])
-}
-
-ChainPackWriter.prototype.writeDateTime = function(dt)
-{
-	if(!dt || typeof(dt) !== "object" || dt.utcOffsetMin == ChainPack.INVALID_MIN_OFFSET_FROM_UTC) {
-		// invalid datetime
-		dt = {epochMsec: ChainPack.SHV_EPOCH_MSEC, utcOffsetMin: ChainPack.INVALID_MIN_OFFSET_FROM_UTC}
-	}
-
-	this.ctx.putByte(ChainPack.CP_DateTime);
-
-	let msecs = dt.epochMsec;
-	msecs = msecs - ChainPack.SHV_EPOCH_MSEC;
-	if(msecs < 0)
-		throw new RangeError("DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.");
-
-	let offset = (dt.utcOffsetMin / 15) & 0x7F;
-
-	let ms = msecs % 1000;
-	if(ms == 0)
-		msecs /= 1000;
-	let bi = new BInt(msecs);
-	if(offset != 0) {
-		bi.leftShift(7);
-		bi.val[bi.val.length - 1] |= offset;
-	}
-	bi.leftShift(2);
-	if(offset != 0)
-		bi.val[bi.val.length - 1] |= 1;
-	if(ms == 0)
-		bi.val[bi.val.length - 1] |= 2;
-
-	// save as signed int
-	let bitcnt = bi.significantBitsCount() + 1;
-	bi.resize(ChainPackWriter.bytesNeeded(bitcnt));
-	this.writeUIntDataHelper(bi);
-}
-
-export {ChainPack, ChainPackReader, ChainPackWriter};
+export {toChainPack, ChainPackReader, ChainPackWriter, ChainpackProtocolType};

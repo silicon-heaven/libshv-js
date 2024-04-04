@@ -1,63 +1,117 @@
-"use strict"
-import RpcValue from "./rpcvalue.ts"
+import {IMap, Int, MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue.ts';
+import {toCpon} from './cpon.ts';
+import {toChainPack} from './chainpack.ts';
 
-function RpcMessage(rpc_val)
-{
-	if(typeof rpc_val === 'undefined')
-		this.rpcValue = new RpcValue();
-	else if(typeof rpc_val === 'null')
-		this.rpcValue = null;
-	else if(rpc_val && rpc_val instanceof RpcValue)
-		this.rpcValue = rpc_val;
-	else
-		throw new TypeError("RpcMessage cannot be constructed with " + typeof rpc_val)
+const TagRequestId = 8;
+const TagShvPath = 9;
+const TagMethod = 10;
+const TagCallerIds = 11;
 
-	if(this.rpcValue) {
-		if(!this.rpcValue.meta)
-			this.rpcValue.meta = {}
-		if(!this.rpcValue.value)
-			this.rpcValue.value = {}
-		this.rpcValue.type = RpcValue.Type.IMap
-	}
+const KeyParams = 1;
+const KeyResult = 2;
+const KeyError = 3;
+
+class RpcMessage {
+    value: IMap;
+    meta: MetaMap;
+    constructor(rpc_val?: RpcValue) {
+        if (rpc_val === undefined) {
+            this.value = new IMap();
+            this.meta = new MetaMap();
+            return;
+        }
+
+        if (!(rpc_val instanceof RpcValueWithMetaData && rpc_val.value instanceof IMap)) {
+            throw new TypeError(`RpcMessage initialized with a non-IMap: ${new TextDecoder().decode(toCpon(rpc_val))}`);
+        }
+
+        this.value = rpc_val.value;
+        this.meta = rpc_val.meta;
+    }
+
+    isValid() {
+        return this.shvPath() && (this.isRequest() || this.isResponse || this.isSignal());
+    }
+
+    isRequest(): boolean {
+        return this.requestId() !== undefined && this.method() !== undefined;
+    }
+
+    isResponse(): boolean {
+        return this.requestId() !== undefined && this.method() === undefined;
+    }
+
+    isSignal(): boolean {
+        return this.requestId() === undefined && this.method() !== undefined;
+    }
+
+    requestId(): Int | undefined {
+        return (this.meta.value[TagRequestId] as Int);
+    }
+
+    setRequestId(id: number | Int) {
+        this.meta.value[TagRequestId] = new Int(id);
+    }
+
+    callerIds(): RpcValue[] | undefined {
+        return this.meta.value[TagCallerIds] as RpcValue[];
+    }
+
+    setCallerIds(ids: RpcValue[]) {
+        this.meta.value[TagCallerIds] = ids;
+    }
+
+    shvPath(): string | undefined {
+        return (this.meta.value[TagShvPath] as string);
+    }
+
+    setShvPath(val: string) {
+        this.meta.value[TagShvPath] = val;
+    }
+
+    method(): string | undefined {
+        return (this.meta.value[TagMethod] as string);
+    }
+
+    setMethod(val: string) {
+        this.meta.value[TagMethod] = val;
+    }
+
+    params() {
+        return this.value.value[KeyParams];
+    }
+
+    setParams(params: RpcValue) {
+        this.value.value[KeyParams] = params;
+    }
+
+    result() {
+        return this.value.value[KeyResult];
+    }
+
+    setResult(result: RpcValue) {
+        this.value.value[KeyResult] = result;
+    }
+
+    error() {
+        return this.value.value[KeyError];
+    }
+
+    setError(error: string) {
+        this.value.value[KeyError] = error;
+    }
+
+    toCpon() {
+        return toCpon(new RpcValueWithMetaData(this.value, this.meta));
+    }
+
+    toChainPack() {
+        return toChainPack(new RpcValueWithMetaData(this.value, this.meta));
+    }
 }
 
-RpcMessage.TagRequestId = "8";
-RpcMessage.TagShvPath = "9";
-RpcMessage.TagMethod = "10";
-RpcMessage.TagCallerIds = "11";
+export type RpcResponse = {
+    result?: RpcValue;
+};
 
-RpcMessage.KeyParams = "1";
-RpcMessage.KeyResult = "2";
-RpcMessage.KeyError = "3";
-
-RpcMessage.prototype.isValid = function() {return this.rpcValue? true: false; }
-RpcMessage.prototype.isRequest = function() {return this.requestId() && this.method(); }
-RpcMessage.prototype.isResponse = function() {return this.requestId() && !this.method(); }
-RpcMessage.prototype.isSignal = function() {return !this.requestId() && this.method(); }
-
-RpcMessage.prototype.requestId = function() {return this.isValid()? this.rpcValue.meta[RpcMessage.TagRequestId]: 0; }
-RpcMessage.prototype.setRequestId = function(id) {return this.rpcValue.meta[RpcMessage.TagRequestId] = id; }
-
-RpcMessage.prototype.callerIds = function() {return this.isValid()? this.rpcValue.meta[RpcMessage.TagCallerIds]: []; }
-RpcMessage.prototype.setCallerIds = function(id) {return this.rpcValue.meta[RpcMessage.TagCallerIds] = id; }
-
-RpcMessage.prototype.shvPath = function() {return this.isValid()? this.rpcValue.meta[RpcMessage.TagShvPath]: null; }
-RpcMessage.prototype.setShvPath = function(val) {return this.rpcValue.meta[RpcMessage.TagShvPath] = val; }
-
-RpcMessage.prototype.method = function() {return this.isValid()? this.rpcValue.meta[RpcMessage.TagMethod]: null; }
-RpcMessage.prototype.setMethod = function(val) {return this.rpcValue.meta[RpcMessage.TagMethod] = val; }
-
-RpcMessage.prototype.params = function() {return this.isValid()? this.rpcValue.value[RpcMessage.KeyParams]: null; }
-RpcMessage.prototype.setParams = function(params) {return this.rpcValue.value[RpcMessage.KeyParams] = params; }
-
-RpcMessage.prototype.result = function() {return this.isValid()? this.rpcValue.value[RpcMessage.KeyResult]: null; }
-RpcMessage.prototype.setResult = function(result) {return this.rpcValue.value[RpcMessage.KeyResult] = result; }
-
-RpcMessage.prototype.error = function() {return this.isValid()? this.rpcValue.value[RpcMessage.KeyError]: null; }
-RpcMessage.prototype.setError = function(err) {return this.rpcValue.value[RpcMessage.KeyError] = err; }
-
-RpcMessage.prototype.toString = function() {return this.isValid()? this.rpcValue.toString(): ""; }
-RpcMessage.prototype.toCpon = function() {return this.isValid()? this.rpcValue.toCpon(): ""; }
-RpcMessage.prototype.toChainPack = function() {return this.isValid()? this.rpcValue.toChainPack(): ""; }
-
-export default RpcMessage;
+export {RpcMessage};

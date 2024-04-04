@@ -1,165 +1,130 @@
-"use strict"
-import {UnpackContext} from "./cpcontext.ts"
-import {Cpon, CponReader, CponWriter} from "./cpon.ts"
-import {ChainPackReader, ChainPackWriter} from "./chainpack.ts"
+class Int {
+    private readonly value: number;
 
-function RpcValue(value, meta, type)
-{
-	if(value)
-		this.value = value;
-	if(meta)
-		this.meta = meta;
-	if(type) {
-		this.type = type;
-	}
-	else {
-		if(typeof value == "null")
-			this.type = RpcValue.Type.Null;
-		else if(typeof value == "boolean")
-			this.type = RpcValue.Type.Bool;
-		else if(typeof value == "string") {
-			this.type = RpcValue.Type.String;
-		}
-		else if(value instanceof String) {
-			this.type = RpcValue.Type.String;
-		}
-		else if(value instanceof ArrayBuffer) {
-			this.type = RpcValue.Type.Blob;
-		}
-		else if(Array.isArray(value))
-			this.type = RpcValue.Type.List;
-		else if(typeof value == "Object") {
-			if(value instanceof Date) {
-				this.value = {epochMsec: value.valueOf(), utcOffsetMin: -value.getTimezoneOffset()}
-				this.type = RpcValue.Type.DateTime;
-			}
-			else {
-				this.type = RpcValue.Type.Map;
-			}
-		}
-		else if(Number.isInteger(value))
-			this.type = RpcValue.Type.Int;
-		else if(Number.isFinite(value))
-			this.type = RpcValue.Type.Double;
-	}
+    constructor(u: number | Int) {
+        if (!Number.isInteger(u)) {
+            throw new TypeError(`Invalid value '${u.toString()}' for Int must a positive integral number`);
+        }
+
+        this.value = Number(u);
+    }
+
+    [Symbol.toPrimitive](hint: string) {
+        if (hint === 'string') {
+            return this.toString();
+        }
+
+        return this.value;
+    }
+
+    toString() {
+        return this.value.toString();
+    }
 }
 
-RpcValue.Type = Object.freeze({
-	"Null": 1,
-	"Bool": 2,
-	"Int": 3,
-	"UInt": 4,
-	"Double": 5,
-	"Decimal": 6,
-	"String": 7,
-	"DateTime": 8,
-	"List": 9,
-	"Map": 10,
-	"IMap": 11,
-	"Blob": 12,
-})
+class UInt {
+    private readonly value: number;
 
-RpcValue.fromCpon = function(cpon)
-{
-	let unpack_context = null;
-	if(typeof cpon === 'string' || cpon instanceof String) {
-		unpack_context = new UnpackContext(Cpon.stringToUtf8(cpon));
-	}
-	else if(cpon instanceof ArrayBuffer) {
-		unpack_context = new UnpackContext(cpon);
-	}
-	if(unpack_context === null)
-		throw new TypeError("Invalid input data type")
-	let rd = new CponReader(unpack_context);
-	return rd.read();
+    constructor(u: number) {
+        if (u < 0 || !Number.isInteger(u)) {
+            throw new Error(`Invalid value '${u}' for UInt must a positive integral number`);
+        }
+
+        this.value = u;
+    }
+
+    [Symbol.toPrimitive](hint: string) {
+        if (hint === 'string') {
+            return this.toString();
+        }
+
+        return this.value;
+    }
+
+    toString() {
+        return `${this.value.toString()}`;
+    }
 }
 
-RpcValue.fromChainPack = function(data)
-{
-	let unpack_context = new UnpackContext(data);
-	let rd = new ChainPackReader(unpack_context);
-	return rd.read();
+class Double {
+    private readonly value: number;
+
+    constructor(u: number) {
+        this.value = u;
+    }
+
+    [Symbol.toPrimitive](hint: string) {
+        if (hint === 'string') {
+            return this.toString();
+        }
+
+        return this.value;
+    }
+
+    toString() {
+        return `Double{${this.value.toString()}}`;
+    }
 }
 
-RpcValue.prototype.toInt = function()
-{
-	switch(this.type) {
-		case RpcValue.Type.Int:
-		case RpcValue.Type.UInt:
-			return this.value;
-		case RpcValue.Type.Decimal:
-			return this.value.mantisa * (10 ** this.value.exponent);
-		case RpcValue.Type.Double:
-			return (this.value >> 0);
-	}
-	return 0;
+class Decimal {
+    mantisa: number;
+    exponent: number;
+    constructor(mantisa: number, exponent: number) {
+        if (Number.isInteger(exponent)) {
+            throw new TypeError('Decimal: exponent must be integral');
+        }
+
+        if (mantisa < -10 || mantisa > 10) {
+            throw new Error('Decimal: mantisa must be between -10 and 10');
+        }
+
+        this.mantisa = mantisa;
+        this.exponent = exponent;
+    }
 }
 
-RpcValue.prototype.asString = function()
-{
-	switch (this.type) {
-	case RpcValue.Type.Null:
-	case RpcValue.Type.UInt:
-	case RpcValue.Type.Int:
-	case RpcValue.Type.Double:
-	case RpcValue.Type.Decimal:
-	case RpcValue.Type.List:
-	case RpcValue.Type.Map:
-	case RpcValue.Type.IMap:
-	case RpcValue.Type.DateTime:
-	case RpcValue.Type.Bool:
-	case RpcValue.Type.Blob:
-		break;
-	case RpcValue.Type.String: return this.value;
-	}
-	return "";
+type Null = undefined;
+type Bool = boolean;
+type Blob = ArrayBuffer;
+type ShvString = string;
+type DateTime = Date;
+type List = RpcValue[];
+
+type ShvMapDefaultType = Record<string, RpcValue | undefined>;
+class ShvMap<T extends ShvMapDefaultType = ShvMapDefaultType> {
+    constructor(public value: T = {} as T) {}
 }
 
-RpcValue.prototype.toString = function()
-{
-	switch (this.type) {
-	case RpcValue.Type.Null:
-	case RpcValue.Type.UInt:
-	case RpcValue.Type.Int:
-	case RpcValue.Type.Double:
-	case RpcValue.Type.Decimal:
-	case RpcValue.Type.List:
-	case RpcValue.Type.Map:
-	case RpcValue.Type.IMap:
-	case RpcValue.Type.DateTime:
-	case RpcValue.Type.Bool:
-		let ba = this.toCpon();
-		return Cpon.utf8ToString(ba);
-	case RpcValue.Type.Blob:
-			return Cpon.utf8ToString(this.value);
-	case RpcValue.Type.String:
-			return this.value;
-	}
-	return "";
+type IMapDefaultType = Record<number, RpcValue | undefined>;
+class IMap<T extends IMapDefaultType = IMapDefaultType> {
+    constructor(public value: T = {} as T) {}
 }
 
-RpcValue.prototype.toCpon = function()
-{
-	let wr = new CponWriter();
-	wr.write(this);
-	return wr.ctx.buffer();
+export type RpcValueType =
+    Null |
+    Bool |
+    Int |
+    UInt |
+    Double |
+    Decimal |
+    Blob |
+    ShvString |
+    DateTime |
+    List |
+    ShvMap |
+    IMap;
+
+class MetaMap {
+    value: Record<number | string, RpcValue | undefined>;
+    constructor(obj?: Record<number | string, RpcValue | undefined>) {
+        this.value = obj ?? {};
+    }
 }
 
-RpcValue.prototype.toCponAsString = function()
-{
-	return Cpon.utf8ToString(this.toCpon());
+class RpcValueWithMetaData {
+    constructor(public value: RpcValueType, public meta: MetaMap) {}
 }
 
-RpcValue.prototype.toChainPack = function()
-{
-	let wr = new ChainPackWriter();
-	wr.write(this);
-	return wr.ctx.buffer();
-}
+export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-RpcValue.prototype.isValid = function()
-{
-	return (this.value || this.value === '') && this.type;
-}
-
-export default RpcValue;
+export {Decimal, Double, Int, IMap, MetaMap, RpcValueWithMetaData, ShvMap, UInt};
