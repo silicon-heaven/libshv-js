@@ -1,0 +1,32 @@
+{
+    "space": 4,
+    "rules": {
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+
+        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/prefer-promise-reject-errors": "off",
+        "@typescript-eslint/promise-function-async": "off",
+        "capitalized-comments": "off",
+        "max-depth": "off",
+        "@typescript-eslint/padding-line-between-statements": "off",
+        "no-constant-condition": ["error", {
+            "checkLoops": false
+        }],
+        "complexity": "off",
+        "no-bitwise": "off",
+        "object-curly-newline": ["error", {
+            "ImportDeclaration": "never"
+        }],
+        "n/file-extension-in-import": "off",
+        "promise-function-async": "off",
+        "prefer-promise-reject-errors": "off",
+        "eslint-disable-next-line prefer-promise-reject-errors": "off",
+        "unicorn/explicit-length-check": "off",
+        "unicorn/no-negated-condition": "off",
+        "unicorn/switch-case-braces": "off",
+        "unicorn/prevent-abbreviations": "off"
+    }
+}
