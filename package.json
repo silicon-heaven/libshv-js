@@ -13,5 +13,14 @@
   "bugs": {
     "url": "https://github.com/silicon-heaven/libshv-js/issues"
   },
-  "homepage": "https://github.com/silicon-heaven/libshv-js"
+  "homepage": "https://github.com/silicon-heaven/libshv-js",
+  "exports": {
+    "./bint.ts": "./src/bint.ts",
+    "./chainpack.ts": "./src/chainpack.ts",
+    "./cpcontext.ts": "./src/cpcontext.ts",
+    "./cpon.ts": "./src/cpon.ts",
+    "./rpcmessage.ts": "./src/rpcmessage.ts",
+    "./rpcvalue.ts": "./src/rpcvalue.ts",
+    "./ws-client.ts": "./src/ws-client.ts"
+  }
 }
