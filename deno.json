@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "deno.window"]
+  },
+  "tasks": {
+    "lint": "deno run --allow-read --allow-write --allow-net --allow-sys --allow-env npm:xo --reporter unix src/*"
   }
 }

@@ -804,13 +804,13 @@ class CponWriter {
     }
 
     writeUInt(num: UInt) {
-        const s = num.toString();
+        const s = Number(num).toString();
         this.ctx.writeStringUtf8(s);
         this.ctx.putByte('u'.codePointAt(0)!);
     }
 
     writeInt(num: Int) {
-        const s = num.toString();
+        const s = Number(num).toString();
         this.ctx.writeStringUtf8(s);
     }
 

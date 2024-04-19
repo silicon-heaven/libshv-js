@@ -1,24 +1,24 @@
-class Int {
-    private readonly value: number;
+class Int<T = number> {
+    private readonly value: T;
 
-    constructor(u: number | Int) {
+    constructor(u: T | Int<T>) {
+        if (u instanceof Int) {
+            this.value = u.value;
+            return;
+        }
         if (!Number.isInteger(u)) {
-            throw new TypeError(`Invalid value '${u.toString()}' for Int must a positive integral number`);
+            throw new TypeError('Value for Int must a positive integral number');
         }
 
-        this.value = Number(u);
+        this.value = u;
     }
 
     [Symbol.toPrimitive](hint: string) {
         if (hint === 'string') {
-            return this.toString();
+            return this.value;
         }
 
         return this.value;
-    }
-
-    toString() {
-        return this.value.toString();
     }
 }
 
@@ -83,12 +83,12 @@ class Decimal {
     }
 }
 
-type Null = undefined;
-type Bool = boolean;
-type Blob = ArrayBuffer;
-type ShvString = string;
-type DateTime = Date;
-type List = RpcValue[];
+export type Null = undefined;
+export type Bool = boolean;
+export type Blob = ArrayBuffer;
+export type ShvString = string;
+export type DateTime = Date;
+export type List = RpcValue[];
 
 type ShvMapDefaultType = Record<string, RpcValue | undefined>;
 class ShvMap<T extends ShvMapDefaultType = ShvMapDefaultType> {
