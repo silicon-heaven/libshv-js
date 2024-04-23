@@ -58,7 +58,7 @@ class CponReader {
 
     read(): RpcValue {
         let meta: MetaMap | undefined;
-        this.skipWhiteIsignificant();
+        this.skipWhitespace();
         let b = this.ctx.peekByte();
         if (b === '<'.codePointAt(0)) {
             meta = this.readMetaMap();
@@ -69,7 +69,7 @@ class CponReader {
             return ret;
         };
 
-        this.skipWhiteIsignificant();
+        this.skipWhitespace();
         b = this.ctx.peekByte();
         // console.log("CHAR:", b, String.fromCodePoint(b));
         // [0-9+-]
@@ -143,7 +143,7 @@ class CponReader {
         throw new TypeError('Malformed Cpon input.');
     }
 
-    skipWhiteIsignificant() {
+    skipWhitespace() {
         const SPACE = ' '.codePointAt(0)!;
         const SLASH = '/'.codePointAt(0)!;
         const STAR = '*'.codePointAt(0)!;
@@ -402,7 +402,7 @@ class CponReader {
         const lst = [];
         this.ctx.getByte(); // eat '['
         while (true) {
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const b = this.ctx.peekByte();
             if (b === ']'.codePointAt(0)) {
                 this.ctx.getByte();
@@ -546,7 +546,6 @@ class CponReader {
             }
             mantisa += decimals;
             mantisa = is_neg ? -mantisa : mantisa;
-            console.log(new Decimal(mantisa, exponent - dec_cnt));
             return new Decimal(mantisa, exponent - dec_cnt);
         }
         if (is_uint) {
@@ -559,7 +558,7 @@ class CponReader {
         const map = new MapTypeCtor();
         this.ctx.getByte(); // eat start
         while (true) {
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const b = this.ctx.peekByte();
             if (b === terminator) {
                 this.ctx.getByte();
@@ -570,7 +569,7 @@ class CponReader {
                 throw new TypeError('Map/IMap/MetaMap key can\'t have its own MetaData');
             }
 
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const val = this.read();
 
             if (map instanceof MetaMap && typeof key === 'string') {
