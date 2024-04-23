@@ -50,12 +50,8 @@ class Decimal {
     mantisa: number;
     exponent: number;
     constructor(mantisa: number, exponent: number) {
-        if (Number.isInteger(exponent)) {
-            throw new TypeError('Decimal: exponent must be integral');
-        }
-
-        if (mantisa < -10 || mantisa > 10) {
-            throw new Error('Decimal: mantisa must be between -10 and 10');
+        if (!Number.isInteger(exponent)) {
+            throw new TypeError(`Decimal: exponent must be integral (${exponent})`);
         }
 
         this.mantisa = mantisa;

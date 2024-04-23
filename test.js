@@ -83,13 +83,13 @@ class Test
 
 			let rv1 = fromCpon(cpon1);
 			let cpn1 = toCpon(rv1);
-			console.log(cpon1, "\t--cpon------>\t", cpn1)
+			console.log("testing", cpon1, "\t--cpon------>\t", cpn1)
 			this.checkEq(cpn1, cpon2);
 
 			//let cpk1 = toChainPack(rv1);
 			//let rv2 = fromChainPack(cpk1);
-			//let cpn2 = rv2.toCponAsString();
-			//console.log(cpn1, "\t--chainpack->\t", cpn2, "\n")
+			//let cpn2 = toCpon(rv2);
+			//console.log("testing", cpn1, "\t--chainpack->\t", cpn2, "\n")
 			//this.checkEq(cpn1, cpn2);
 		}
 	}

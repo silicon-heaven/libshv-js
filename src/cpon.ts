@@ -501,43 +501,52 @@ class CponReader {
 
         mantisa = Number(this.readInt());
         b = this.ctx.peekByte();
-        switch (b) {
-            case 'u'.codePointAt(0): {
-                is_uint = true;
-                this.ctx.getByte();
-                break;
-            }
-            case '.'.codePointAt(0): {
-                is_decimal = true;
-                this.ctx.getByte();
-                const ix1 = this.ctx.index;
-                decimals = Number(this.readInt());
-                // if(n < 0)
-                //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
-                dec_cnt = this.ctx.index - ix1;
-                b = this.ctx.peekByte();
-                break;
-            }
-            case 'e'.codePointAt(0):
-            case 'E'.codePointAt(0): {
-                is_decimal = true;
-                this.ctx.getByte();
-                const ix1 = this.ctx.index;
-                exponent = Number(this.readInt());
-                if (ix1 === this.ctx.index) {
-                    throw new TypeError('Malformed number exponential part.');
+        (() => {
+            while (true) {
+                switch (b) {
+                    case 'u'.codePointAt(0): {
+                        is_uint = true;
+                        this.ctx.getByte();
+                        return;
+                    }
+                    case '.'.codePointAt(0): {
+                        is_decimal = true;
+                        this.ctx.getByte();
+                        const ix1 = this.ctx.index;
+                        decimals = Number(this.readInt());
+                        // if(n < 0)
+                        //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
+                        dec_cnt = this.ctx.index - ix1;
+                        b = this.ctx.peekByte();
+                        if (b >= 0) {
+                            continue;
+                        }
+                        return;
+                    }
+                    case 'e'.codePointAt(0):
+                    case 'E'.codePointAt(0): {
+                        is_decimal = true;
+                        this.ctx.getByte();
+                        const ix1 = this.ctx.index;
+                        exponent = Number(this.readInt());
+                        if (ix1 === this.ctx.index) {
+                            throw new TypeError('Malformed number exponential part.');
+                        }
+                        return;
+                    }
+                    default:
+                        return;
                 }
-                break;
             }
-            default:
-                break;
-        }
+
+        })();
         if (is_decimal) {
             for (let i = 0; i < dec_cnt; ++i) {
                 mantisa *= 10;
             }
             mantisa += decimals;
             mantisa = is_neg ? -mantisa : mantisa;
+            console.log(new Decimal(mantisa, exponent - dec_cnt));
             return new Decimal(mantisa, exponent - dec_cnt);
         }
         if (is_uint) {
