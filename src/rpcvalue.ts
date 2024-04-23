@@ -1,5 +1,5 @@
 class Int<T = number> {
-    private readonly value: T;
+    readonly value: T;
 
     constructor(u: T | Int<T>) {
         if (u instanceof Int) {
@@ -13,17 +13,13 @@ class Int<T = number> {
         this.value = u;
     }
 
-    [Symbol.toPrimitive](hint: string) {
-        if (hint === 'string') {
-            return this.value;
-        }
-
+    [Symbol.toPrimitive](_hint: string) {
         return this.value;
     }
 }
 
 class UInt {
-    private readonly value: number;
+    readonly value: number;
 
     constructor(u: number) {
         if (u < 0 || !Number.isInteger(u)) {
@@ -33,11 +29,7 @@ class UInt {
         this.value = u;
     }
 
-    [Symbol.toPrimitive](hint: string) {
-        if (hint === 'string') {
-            return this.toString();
-        }
-
+    [Symbol.toPrimitive](_hint: string) {
         return this.value;
     }
 
@@ -47,22 +39,10 @@ class UInt {
 }
 
 class Double {
-    private readonly value: number;
+    readonly value: number;
 
     constructor(u: number) {
         this.value = u;
-    }
-
-    [Symbol.toPrimitive](hint: string) {
-        if (hint === 'string') {
-            return this.toString();
-        }
-
-        return this.value;
-    }
-
-    toString() {
-        return `Double{${this.value.toString()}}`;
     }
 }
 

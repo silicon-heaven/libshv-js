@@ -815,7 +815,7 @@ class CponWriter {
     }
 
     writeDouble(num: Double) {
-        let s = num.toString();
+        let s = num.value.toString();
         if (!s.includes('.')) {
             s += '.';
         }
