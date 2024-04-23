@@ -155,9 +155,6 @@ class CponReader {
             if (b < 1) {
                 return;
             }
-            if (b <= SPACE) {
-                continue;
-            }
 
             if (b > SPACE) {
                 switch (b) {
