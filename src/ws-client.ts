@@ -145,7 +145,7 @@ class WsClient {
 
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
                     const cb = this.rpcHandlers[Number(requestId)];
-                    cb({result: rpc_msg.result()});
+                    cb(rpc_msg.resultOrError());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }

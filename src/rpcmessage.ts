@@ -85,16 +85,16 @@ class RpcMessage {
         this.value.value[KeyParams] = params;
     }
 
-    result() {
+    resultOrError() {
+        if (this.value.value[KeyError] !== undefined) {
+            return new RpcError(this.value.value[KeyResult] as ErrorMap);
+        }
+
         return this.value.value[KeyResult];
     }
 
     setResult(result: RpcValue) {
         this.value.value[KeyResult] = result;
-    }
-
-    error() {
-        return this.value.value[KeyError];
     }
 
     setError(error: string) {
@@ -110,8 +110,46 @@ class RpcMessage {
     }
 }
 
-export type RpcResponse<T = RpcValue> = {
-    result: T;
-};
+const ERROR_CODE = 1;
+const ERROR_MESSAGE = 2;
+const ERROR_DATA = 3;
 
-export {RpcMessage};
+enum ErrorCode {
+    InvalidRequest = 1,
+    MethodNotFound = 2,
+    InvalidParams = 3,
+    InternalError = 4,
+    ParseError = 5,
+    MethodCallTimeout = 6,
+    MethodCallCancelled = 7,
+    MethodCallException = 8,
+    Unknown = 9,
+    LoginRequired = 10,
+    UserIDRequired = 11,
+    NotImplemented = 12,
+}
+
+type ErrorMap = IMap<{
+    [ERROR_CODE]: Int<ErrorCode>;
+    [ERROR_MESSAGE]: string | undefined;
+    [ERROR_DATA]: RpcValue | undefined;
+}>;
+
+class RpcError {
+    constructor(private readonly err_info: ErrorMap) {}
+    code() {
+        return this.err_info.value[ERROR_CODE];
+    }
+
+    message() {
+        return this.err_info.value[ERROR_MESSAGE];
+    }
+
+    data() {
+        return this.err_info.value[ERROR_DATA];
+    }
+}
+
+export type RpcResponse<T = RpcValue> = T | RpcError;
+
+export {RpcMessage, RpcError, ErrorCode};
