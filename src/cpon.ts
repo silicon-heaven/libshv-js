@@ -593,7 +593,7 @@ class CponWriter {
         }
 
         switch (true) {
-            case rpc_val === null:
+            case rpc_val === undefined:
                 this.ctx.writeStringUtf8('null');
                 break;
             case typeof rpc_val === 'boolean':
