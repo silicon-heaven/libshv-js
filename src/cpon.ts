@@ -1,5 +1,5 @@
 import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
-import {PackContext, type UnpackContext} from './cpcontext.ts';
+import {PackContext, UnpackContext} from './cpcontext.ts';
 
 const hexify = (byte: number) => {
     if (byte < 10) {
@@ -861,9 +861,18 @@ class CponWriter {
 const toCpon = (value: RpcValue) => {
     const wr = new CponWriter();
     wr.write(value);
-    return wr.ctx.buffer();
+    return new TextDecoder().decode(wr.ctx.buffer());
+};
+
+const fromCpon = (str: string | Uint8Array) => {
+    if (typeof str === 'string') {
+        str = new TextEncoder().encode(str);
+    }
+
+    const rd = new CponReader(new UnpackContext(str.buffer));
+    return rd.read();
 };
 
 const CponProtocolType = 2;
 
-export {utf8ToString, CponWriter, CponReader, CponProtocolType, toCpon};
+export {utf8ToString, CponWriter, CponReader, CponProtocolType, toCpon, fromCpon};

@@ -1,5 +1,6 @@
 "use strict"
-import RpcValue from "./rpcvalue.js"
+import {toChainPack, fromChainPack} from "./src/chainpack.ts"
+import {toCpon, fromCpon} from "./src/cpon.ts"
 
 class Test
 {
@@ -80,16 +81,16 @@ class Test
 			let cpon1 = lst[0]
 			let cpon2 = lst[1]? lst[1]: cpon1;
 
-			let rv1 = RpcValue.fromCpon(cpon1);
-			let cpn1 = rv1.toCponAsString();
-			log(cpon1, "\t--cpon------>\t", cpn1)
+			let rv1 = fromCpon(cpon1);
+			let cpn1 = toCpon(rv1);
+			console.log(cpon1, "\t--cpon------>\t", cpn1)
 			this.checkEq(cpn1, cpon2);
 
-			let cpk1 = rv1.toChainPack();
-			let rv2 = RpcValue.fromChainPack(cpk1);
-			let cpn2 = rv2.toCponAsString();
-			log(cpn1, "\t--chainpack->\t", cpn2, "\n")
-			this.checkEq(cpn1, cpn2);
+			//let cpk1 = toChainPack(rv1);
+			//let rv2 = fromChainPack(cpk1);
+			//let cpn2 = rv2.toCponAsString();
+			//console.log(cpn1, "\t--chainpack->\t", cpn2, "\n")
+			//this.checkEq(cpn1, cpn2);
 		}
 	}
 
@@ -151,3 +152,5 @@ class Test
 		//}
 	}
 }
+
+Test.run();

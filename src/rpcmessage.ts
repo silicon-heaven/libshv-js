@@ -22,7 +22,7 @@ class RpcMessage {
         }
 
         if (!(rpc_val instanceof RpcValueWithMetaData && rpc_val.value instanceof IMap)) {
-            throw new TypeError(`RpcMessage initialized with a non-IMap: ${new TextDecoder().decode(toCpon(rpc_val))}`);
+            throw new TypeError(`RpcMessage initialized with a non-IMap: ${toCpon(rpc_val)}`);
         }
 
         this.value = rpc_val.value;

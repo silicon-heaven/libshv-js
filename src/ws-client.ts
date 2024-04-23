@@ -119,7 +119,7 @@ class WsClient {
 
         this.websocket.addEventListener('message', evt => {
             const rpc_val = dataToRpcValue(evt.data);
-            this.logDebug(`message received: ${new TextDecoder().decode(toCpon(rpc_val))}`);
+            this.logDebug(`message received: ${toCpon(rpc_val)}`);
             const rpc_msg = new RpcMessage(rpc_val);
 
             if (rpc_msg.isSignal()) {
@@ -184,10 +184,10 @@ class WsClient {
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === 1) {
             this.logDebug('sending rpc message:', rpc_msg);
-            const msg_data = this.isUseCpon ? new Uint8Array(rpc_msg.toCpon()) : new Uint8Array(rpc_msg.toChainPack());
+            const msg_data = this.isUseCpon ? new Uint8Array(new TextEncoder().encode(rpc_msg.toCpon())) : new Uint8Array(rpc_msg.toChainPack());
 
             const wr = new ChainPackWriter();
-            wr.writeUIntData(new UInt(msg_data.length + 1));
+            wr.writeUIntData(msg_data.length + 1);
             const dgram = new Uint8Array(wr.ctx.length + 1 + msg_data.length);
             let ix = 0;
             for (let i = 0; i < wr.ctx.length; i++) {
