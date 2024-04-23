@@ -571,11 +571,11 @@ class CponReader {
 
             if (map instanceof MetaMap && typeof key === 'string') {
                 map.value[key] = val;
-            } else if (map instanceof MetaMap && key instanceof Int) {
+            } else if (map instanceof MetaMap && (key instanceof UInt || key instanceof Int)) {
                 map.value[Number(key)] = val;
             } else if (map instanceof ShvMap && typeof key === 'string') {
                 map.value[key] = val;
-            } else if (map instanceof IMap && key instanceof Int) {
+            } else if (map instanceof IMap && (key instanceof UInt || key instanceof Int)) {
                 map.value[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
