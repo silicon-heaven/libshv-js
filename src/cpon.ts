@@ -543,7 +543,7 @@ class CponReader {
         if (is_uint) {
             return new UInt(mantisa);
         }
-        return is_neg ? new UInt(-mantisa) : new Int(mantisa);
+        return new Int(is_neg ? -mantisa : mantisa);
     }
 
     private implReadMap<MapType extends MetaMap | ShvMap | IMap>(MapTypeCtor: new () => MapType, terminator: number) {
