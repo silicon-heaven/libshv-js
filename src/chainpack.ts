@@ -421,10 +421,10 @@ class ChainPackWriter {
                 }
                 break;
             default:
-                num |= 0b1111_0000n << BigInt(bytes_needed - 1);
-                num |= BigInt(bytes_needed - 4 /* n is offset by 4 */ - 1 /* for the control byte */) << BigInt(bytes_needed - 1);
+                num |= 0b1111_0000n << BigInt((bytes_needed - 1) * 8);
+                num |= BigInt(bytes_needed - 4 /* n is offset by 4 */ - 1 /* for the control byte */) << BigInt((bytes_needed - 1) * 8);
                 if (is_negative) {
-                    num |= 0b1000_0000n << BigInt(bytes_needed - 2);
+                    num |= 0b1000_0000n << BigInt((bytes_needed - 2) * 8);
                 }
                 break;
         }

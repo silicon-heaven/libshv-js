@@ -79,16 +79,15 @@ class Test
 			let cpon1 = lst[0]
 			let cpon2 = lst[1]? lst[1]: cpon1;
 
-			console.log("testing", JSON.stringify(cpon1), "\t--cpon------>\t", cpon2)
+			console.log("testing", JSON.stringify(cpon1), "\t-------->\t", cpon2)
 			let rv1 = fromCpon(cpon1);
 			let cpn1 = toCpon(rv1);
 			this.checkEq(cpn1, cpon2);
 
-			//let cpk1 = toChainPack(rv1);
-			//let rv2 = fromChainPack(cpk1);
-			//let cpn2 = toCpon(rv2);
-			//console.log("testing", cpn1, "\t--chainpack->\t", cpn2, "\n")
-			//this.checkEq(cpn1, cpn2);
+			let cpk1 = toChainPack(rv1);
+			let rv2 = fromChainPack(cpk1);
+			let cpn2 = toCpon(rv2);
+			this.checkEq(cpn1, cpn2);
 		}
 	}
 
