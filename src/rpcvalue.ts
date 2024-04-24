@@ -68,7 +68,7 @@ const withOffset = (date: Date, utc_offset?: number) => {
     const cloned_date: DateTime = new Date(date.getTime());
     cloned_date.utc_offset = utc_offset;
     return cloned_date;
-}
+};
 export type List = RpcValue[];
 
 type ShvMapDefaultType = Record<string, RpcValue | undefined>;
