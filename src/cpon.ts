@@ -1,4 +1,4 @@
-import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
+import {type RpcValue, type RpcValueType, DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
 import {PackContext, UnpackContext} from './cpcontext.ts';
 
 const hexify = (byte: number) => {
@@ -289,7 +289,7 @@ class CponReader {
         // let epoch_sec = CponReader.timegm(year, month, mday, hour, min, sec);
         let epoch_msec = Date.UTC(year, month - 1, day, hour, min, sec, msec);
         epoch_msec -= utc_offset * 60_000;
-        return new Date(epoch_msec);
+        return withOffset(new Date(epoch_msec), utc_offset);
     }
 
     readCString() {
@@ -705,21 +705,21 @@ class CponWriter {
         this.ctx.writeStringUtf8('"');
     }
 
-    writeDateTime(dt: Date) {
+    writeDateTime(dt: DateTime) {
         if (!dt) {
             this.ctx.writeStringUtf8('d""');
             return;
         }
         const epoch_msec = dt.getTime();
-        let utc_offset = dt.getTimezoneOffset();
-        const msec = epoch_msec + (60_000 * utc_offset);
-        let s = new Date(msec).toISOString();
-        const rtrim = (msec % 1000) ? 1 : 5;
+        let utc_offset = dt.utc_offset;
+        const local_msec = epoch_msec + (60_000 * (utc_offset ?? 0));
+        let s = new Date(local_msec).toISOString();
+        const rtrim = (local_msec % 1000) ? 1 : 5;
         this.ctx.writeStringUtf8('d"');
         for (let i = 0; i < s.length - rtrim; i++) {
             this.ctx.putByte(s.codePointAt(i)!);
         }
-        if (!utc_offset) {
+        if (utc_offset === undefined || utc_offset === 0) {
             this.ctx.writeStringUtf8('Z');
         } else {
             if (utc_offset < 0) {

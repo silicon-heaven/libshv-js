@@ -1,5 +1,5 @@
 import {utf8ToString} from './cpon.ts';
-import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
+import {type RpcValue, type RpcValueType, DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
 import {UnpackContext, PackContext} from './cpcontext.ts';
 
 enum PackingSchema {
@@ -166,7 +166,7 @@ class ChainPackReader {
                 }
                 msec += SHV_EPOCH_MSEC;
                 msec -= offset * 60_000;
-                return new Date(msec);
+                return withOffset(new Date(msec), offset);
             }
             case PackingSchema.Map: {
                 return impl_return(this.readMap());
@@ -488,7 +488,7 @@ class ChainPackWriter {
         }
     }
 
-    writeDateTime(dt: Date) {
+    writeDateTime(dt: DateTime) {
         this.ctx.putByte(PackingSchema.DateTime);
 
         let msecs = dt.getTime() - SHV_EPOCH_MSEC;
@@ -496,22 +496,20 @@ class ChainPackWriter {
             throw new RangeError('DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.');
         }
 
-        const offset = (dt.getTimezoneOffset() / 15) & 0x7F;
-
         const ms = msecs % 1000;
         if (ms === 0) {
             msecs /= 1000;
         }
 
         let bi = BigInt(msecs);
-        if (offset !== 0) {
+        if (dt.utc_offset !== undefined) {
             bi <<= 7n;
-            bi |= BigInt(offset);
+            bi |= BigInt(dt.utc_offset);
         }
 
         bi <<= 2n;
 
-        if (offset !== 0) {
+        if (dt.utc_offset !== undefined) {
             bi |= 1n;
         }
 
