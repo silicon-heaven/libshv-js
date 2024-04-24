@@ -74,7 +74,7 @@ class Test
 			['d"2019-05-03T11:30:00-0700"', 'd"2019-05-03T11:30:00-07"'],
 			['d"2018-02-02T00:00:00Z"', null],
 			['d"2027-05-03T11:30:12.345+01"', null],
-			])
+		])
 		{
 			let cpon1 = lst[0]
 			let cpon2 = lst[1]? lst[1]: cpon1;
@@ -125,25 +125,13 @@ class Test
 
 	static run()
 	{
-		//try {
-			/*
-			for(let i=0; i<7; i++) {
-				log("---------", i, '---------------')
-				for(const n of [1,255,256,65535, 65536, -1, -255, -65535, -65536]) {
-					let bytes1 = ChainPack.uIntToBBE(n)
-					let bytes2 = ChainPack.rotateLeftBBE(bytes1, i)
-					log(n, "<<", i, '\t', bytes1, "->", bytes2)
-				}
-			}
-			return
-			*/
-			let t = new Test();
+		let t = new Test();
 
-			t.testConversions();
-			t.testDateTime();
-			t.testMapKeys();
+		t.testConversions();
+		t.testDateTime();
+		t.testMapKeys();
 
-			console.log("PASSED")
+		console.log("PASSED")
 		//}
 		//catch(err) {
 		//	log("FAILED:", err)
