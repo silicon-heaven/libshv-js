@@ -4,17 +4,17 @@ import {type DateTime} from './src/rpcvalue.ts';
 
 const checkEq = (e1: string | number, e2: string | number) => {
     if (e1 !== e2) {
-        throw 'test check error: ' + e1 + ' === ' + e2;
+        throw new Error(`test check error: ${e1} === ${e2}`);
     }
 };
 for (const lst of [
-    [(2 ** 31 - 1) + 'u', null],
-    [(2 ** 32 - 1) + 'u', null], // too big for JS bitwise operations
-    [String(2 ** 31 - 1), null],
-    [String(-(2 ** 30 - 1)), null],
-    [String(2 ** 53 - 1), null], // Number.MAX_SAFE_INTEGER
-    [String(-(2 ** 53 - 1)), null], // Number.MIN_SAFE_INTEGER
-    [String(2 ** 32 - 1), null], // too big for JS bitwise operations
+    [((2 ** 31) - 1) + 'u', null],
+    [((2 ** 32) - 1) + 'u', null], // too big for JS bitwise operations
+    [String((2 ** 31) - 1), null],
+    [String(-((2 ** 30) - 1)), null],
+    [String((2 ** 53) - 1), null], // Number.MAX_SAFE_INTEGER
+    [String(-((2 ** 53) - 1)), null], // Number.MIN_SAFE_INTEGER
+    [String((2 ** 32) - 1), null], // too big for JS bitwise operations
     ['true', null],
     ['false', null],
     ['null', null],
@@ -51,12 +51,12 @@ for (const lst of [
     ['<1:2,"foo":<5:6>"bar">[1u,{"a":1},2.30]', null],
     ['i{1:2 // comment to end of line\n}', 'i{1:2}'],
     [`/*comment 1*/{ /*comment 2*/
-	\t\"foo\"/*comment \"3\"*/: \"bar\", //comment to end of line
-	\t\"baz\" : 1,
+	\t"foo"/*comment "3"*/: "bar", //comment to end of line
+	\t"baz" : 1,
 	/*
 	\tmultiline comment
-	\t\"baz\" : 1,
-	\t\"baz\" : 1, // single inside multi
+	\t"baz" : 1,
+	\t"baz" : 1, // single inside multi
 	*/
 	}`, '{"foo":"bar","baz":1}'],
     ['<1:2>[3,<4:5>6]', null],
@@ -66,7 +66,7 @@ for (const lst of [
     ['d"2027-05-03T11:30:12.345+01"', null],
 ]) {
     const cpon1 = lst[0];
-    const cpon2 = (lst[1] ? lst[1] : cpon1)!;
+    const cpon2 = lst[1] ?? cpon1!;
 
     console.log('testing', JSON.stringify(cpon1), '\t-------->\t', cpon2);
     const rv1 = fromCpon(cpon1!);
