@@ -491,7 +491,7 @@ class ChainPackWriter {
     writeDateTime(dt: DateTime) {
         this.ctx.putByte(PackingSchema.DateTime);
 
-        let msecs = dt.getTime() - SHV_EPOCH_MSEC;
+        let msecs = (dt.getTime() + (60_000 * (dt.utc_offset ?? 0))) - SHV_EPOCH_MSEC;
         if (msecs < 0) {
             throw new RangeError('DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.');
         }
@@ -504,7 +504,7 @@ class ChainPackWriter {
         let bi = BigInt(msecs);
         if (dt.utc_offset !== undefined) {
             bi <<= 7n;
-            bi |= BigInt(dt.utc_offset);
+            bi |= BigInt((dt.utc_offset / 15) & 0x7F);
         }
 
         bi <<= 2n;
