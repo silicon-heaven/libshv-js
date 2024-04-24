@@ -37,11 +37,11 @@ const uint8_array_to_bigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
     if (type === 'Int') {
         if (bytes.length < 5) {
             const sign_mask = 0x80 >> bytes.length;
-            is_neg = Boolean(bytes[-1] & sign_mask);
-            bytes[-1] &= ~sign_mask;
+            is_neg = Boolean(bytes[0] & sign_mask);
+            bytes[0] &= ~sign_mask;
         } else {
-            is_neg = Boolean(bytes[-2] & 128);
-            bytes[-2] &= ~128;
+            is_neg = Boolean(bytes[1] & 128);
+            bytes[1] &= ~128;
         }
     }
 
