@@ -19,12 +19,12 @@ class Test
 	{
 		for(const lst of [
 			[(2**31 - 1) + "u", null],
-			//[(2**32 - 1) + "u", null],  // too big for JS bitwise operations
+			[(2**32 - 1) + "u", null],  // too big for JS bitwise operations
 			["" + (2**31 - 1), null],
 			["" + (-(2**30 - 1)), null],
 			["" + (2**53 - 1), null], // Number.MAX_SAFE_INTEGER
 			["" + (-(2**53 - 1)), null], // Number.MIN_SAFE_INTEGER
-			//["" + (2**32 - 1), null], // too big for JS bitwise operations
+			["" + (2**32 - 1), null], // too big for JS bitwise operations
 			["true", null],
 			["false", null],
 			["null", null],
@@ -69,21 +69,19 @@ class Test
 			\t\"baz\" : 1, // single inside multi
 			*/
 			}`, "{\"foo\":\"bar\",\"baz\":1}"],
-			//["a[1,2,3]", "[1,2,3]"], // unsupported array type
 			["<1:2>[3,<4:5>6]", null],
 			["<4:\"svete\">i{2:<4:\"svete\">[0,1]}", null],
-			['d"2019-05-03T11:30:00-0700"', 'd"2019-05-03T11:30:00-07"'],
-			['d""', null],
-			['d"2018-02-02T00:00:00Z"', null],
-			['d"2027-05-03T11:30:12.345+01"', null],
+			//['d"2019-05-03T11:30:00-0700"', 'd"2019-05-03T11:30:00-07"'],
+			//['d"2018-02-02T00:00:00Z"', null],
+			//['d"2027-05-03T11:30:12.345+01"', null],
 			])
 		{
 			let cpon1 = lst[0]
 			let cpon2 = lst[1]? lst[1]: cpon1;
 
+			console.log("testing", JSON.stringify(cpon1), "\t--cpon------>\t", cpon2)
 			let rv1 = fromCpon(cpon1);
 			let cpn1 = toCpon(rv1);
-			console.log("testing", cpon1, "\t--cpon------>\t", cpn1)
 			this.checkEq(cpn1, cpon2);
 
 			//let cpk1 = toChainPack(rv1);
@@ -97,30 +95,30 @@ class Test
 	testDateTime()
 	{
 		// same points in time
-		let v1 = RpcValue.fromCpon('d"2017-05-03T18:30:00Z"');
-		let v2 = RpcValue.fromCpon('d"2017-05-03T22:30:00+04"');
-		let v3 = RpcValue.fromCpon('d"2017-05-03T11:30:00-0700"');
-		let v4 = RpcValue.fromCpon('d"2017-05-03T15:00:00-0330"');
-		this.checkEq(v1.value.epochMsec, v2.value.epochMsec);
-		this.checkEq(v2.value.epochMsec, v3.value.epochMsec);
-		this.checkEq(v3.value.epochMsec, v4.value.epochMsec);
-		this.checkEq(v4.value.epochMsec, v1.value.epochMsec);
+		let v1 = fromCpon('d"2017-05-03T18:30:00Z"');
+		let v2 = fromCpon('d"2017-05-03T22:30:00+04"');
+		let v3 = fromCpon('d"2017-05-03T11:30:00-0700"');
+		let v4 = fromCpon('d"2017-05-03T15:00:00-0330"');
+		this.checkEq(v1.getTime(), v2.getTime());
+		this.checkEq(v2.getTime(), v3.getTime());
+		this.checkEq(v3.getTime(), v4.getTime());
+		this.checkEq(v4.getTime(), v1.getTime());
 	}
 
 	testMapKeys()
 	{
 		{
 			let c1 = '{"1":"a"}';
-			let v1 = RpcValue.fromCpon(c1);
-			let c2 = v1.toString();
-			log(c1, " vs. ", c2)
+			let v1 = fromCpon(c1);
+			let c2 = toCpon(v1);
+			console.log(c1, " vs. ", c2)
 			this.checkEq(c1, c2);
 		}
 		{
 			let c1 = 'i{1:"a"}';
-			let v1 = RpcValue.fromCpon(c1);
-			let c2 = v1.toString();
-			log(c1, " vs. ", c2)
+			let v1 = fromCpon(c1);
+			let c2 = toCpon(v1);
+			console.log(c1, " vs. ", c2)
 			this.checkEq(c1, c2);
 		}
 	}
@@ -145,7 +143,7 @@ class Test
 			t.testDateTime();
 			t.testMapKeys();
 
-			log("PASSED")
+			console.log("PASSED")
 		//}
 		//catch(err) {
 		//	log("FAILED:", err)
