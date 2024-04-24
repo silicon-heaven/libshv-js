@@ -1,6 +1,5 @@
-import BInt from './bint.ts';
 import {utf8ToString} from './cpon.ts';
-import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
 import {UnpackContext, PackContext} from './cpcontext.ts';
 
 enum PackingSchema {
@@ -27,8 +26,62 @@ enum PackingSchema {
 const SHV_EPOCH_MSEC = 1_517_529_600_000;
 const INVALID_MIN_OFFSET_FROM_UTC = (-64 * 15);
 
-// number of bytes needed to encode bit_len
-const bytesNeeded = (bit_len: number) => bit_len <= 28 ? Math.trunc((bit_len - 1) / 7) + 1 : Math.trunc((bit_len - 1) / 8) + 2;
+const div_int = (n: bigint, d: bigint) => {
+    const r = n % d;
+    return [(n - r) / d, r] as const;
+};
+
+const uint8_array_to_bigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
+    let is_neg = false;
+
+    if (type === 'Int') {
+        if (bytes.length < 5) {
+            const sign_mask = 0x80 >> bytes.length;
+            is_neg = Boolean(bytes[0] & sign_mask);
+            bytes[0] &= ~sign_mask;
+        } else {
+            is_neg = Boolean(bytes[1] & 128);
+            bytes[1] &= ~128;
+        }
+    }
+
+    let ret = 0n;
+    for (const byte of bytes) {
+        ret = (ret * BigInt(256)) + BigInt(byte);
+    }
+
+    if (is_neg) {
+        ret = -ret;
+    }
+
+    return ret;
+};
+
+const number_to_uint8_array = (num: bigint) => {
+    let bytes = new Uint8Array(8);
+    let len = 0;
+    while (true) {
+        const res = div_int(num, 256n);
+        num = res[0];
+        bytes[len++] = Number(res[1]);
+        if (num === 0n) {
+            break;
+        }
+    }
+
+    bytes = bytes.subarray(0, len);
+    bytes.reverse();
+    return bytes;
+};
+
+const significant_bits_count = (num: bigint) => {
+    let ret = 0;
+    while (num > 0) {
+        ret++;
+        num >>= 1n;
+    }
+    return ret;
+};
 
 class ChainPackReader {
     ctx: UnpackContext;
@@ -86,21 +139,19 @@ class ChainPackReader {
                 return impl_return(new Decimal(mant, exp));
             }
             case PackingSchema.DateTime: {
-                const bi = this.readUIntDataHelper();
-                let lsb = bi.val.at(-1)!;
-                const has_tz_offset = lsb & 1;
-                const has_not_msec = lsb & 2;
-                bi.signedRightShift(2);
-                lsb = bi.val.at(-1)!;
+                let bi = this.readUIntDataHelper('UInt');
+                const has_tz_offset = bi & 1n;
+                const has_not_msec = bi & 2n;
+                bi >>= 2n;
 
                 let offset = 0;
                 if (has_tz_offset) {
-                    offset = lsb & 0x7F;
+                    offset = Number(bi & 0x7Fn);
                     if (offset & 0x40) {
                         // sign extension
                         offset -= 128;
                     }
-                    bi.signedRightShift(7);
+                    bi >>= 7n;
                 }
 
                 offset *= 15;
@@ -109,13 +160,13 @@ class ChainPackReader {
                     return impl_return(undefined);
                 }
 
-                let msec = bi.toNumber();
+                let msec = Number(bi);
                 if (has_not_msec) {
                     msec *= 1000;
                 }
                 msec += SHV_EPOCH_MSEC;
                 msec -= offset * 60_000;
-                return new Date(msec);
+                return withOffset(new Date(msec), offset);
             }
             case PackingSchema.Map: {
                 return impl_return(this.readMap());
@@ -174,7 +225,7 @@ class ChainPackReader {
         }
     }
 
-    readUIntDataHelper() {
+    readUIntDataHelper(type: 'Int' | 'UInt') {
         let num = 0;
         const head = this.ctx.getByte();
         let bytes_to_read_cnt;
@@ -209,29 +260,27 @@ class ChainPackReader {
             const r = this.ctx.getByte();
             bytes[i + 1] = r;
         }
-        return new BInt(bytes);
+
+        return uint8_array_to_bigint(bytes, type);
     }
 
     readIntData() {
-        const bi = this.readUIntDataHelper();
-        let is_neg;
-        if (bi.byteCount() < 5) {
-            const sign_mask = 0x80 >> bi.byteCount();
-            is_neg = bi.val[0] & sign_mask;
-            bi.val[0] &= ~sign_mask;
-        } else {
-            is_neg = bi.val[1] & 128;
-            bi.val[1] &= ~128;
+        const val = this.readUIntDataHelper('Int');
+        if (val <= Number.MIN_SAFE_INTEGER) {
+            return Number.MIN_SAFE_INTEGER;
         }
-        let num = bi.toNumber();
-        if (is_neg) {
-            num = -num;
+        if (val >= Number.MAX_SAFE_INTEGER) {
+            return Number.MAX_SAFE_INTEGER;
         }
-        return num;
+        return Number(val);
     }
 
     readUIntData() {
-        return this.readUIntDataHelper().toNumber();
+        const val = this.readUIntDataHelper('UInt');
+        if (val >= Number.MAX_SAFE_INTEGER) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+        return Number(val);
     }
 
     readList() {
@@ -337,49 +386,61 @@ class ChainPackWriter {
         }
     }
 
-    writeUIntDataHelper(bint: BInt) {
-        const bytes = bint.val;
+    writeUIntDataHelper(num: bigint, type: 'Int' | 'UInt') {
+        const is_negative = num < 0;
+        if (is_negative) {
+            num = -num;
+        }
+        const significant_bits = significant_bits_count(num) + (/* one more needed for sign bit */ type === 'Int' ? 1 : 0);
+        const bytes_needed = significant_bits <= 28 ? Math.trunc((significant_bits - 1) / 7) + 1 : Math.trunc((significant_bits - 1) / 8) + 2;
 
-        let head = bytes[0];
-        if (bytes.length < 5) {
-            let mask = (0xF0 << (4 - bytes.length)) & 0xFF;
-            head &= ~mask;
-            mask <<= 1;
-            mask &= 0xFF;
-            head |= mask;
-        } else {
-            head = 0xF0 | (bytes.length - 5);
+        switch (bytes_needed) {
+            case 0:
+                throw new Error(`Failed to count bytes needed for ${num}`);
+            case 1:
+                if (is_negative) {
+                    num |= 0b0100_0000n;
+                }
+                break;
+            case 2:
+                num |= 0b1000_0000n << 8n;
+                if (is_negative) {
+                    num |= 0b0010_0000n << 8n;
+                }
+                break;
+            case 3:
+                num |= 0b1100_0000n << 16n;
+                if (is_negative) {
+                    num |= 0b0001_0000n << 16n;
+                }
+                break;
+            case 4:
+                num |= 0b1110_0000n << 24n;
+                if (is_negative) {
+                    num |= 0b0000_1000n << 24n;
+                }
+                break;
+            default:
+                num |= 0b1111_0000n << BigInt((bytes_needed - 1) * 8);
+                num |= BigInt(bytes_needed - 4 /* n is offset by 4 */ - 1 /* for the control byte */) << BigInt((bytes_needed - 1) * 8);
+                if (is_negative) {
+                    num |= 0b1000_0000n << BigInt((bytes_needed - 2) * 8);
+                }
+                break;
         }
 
-        this.ctx.putByte(head);
-
-        for (let i = 1; i < bytes.length; ++i) {
-            this.ctx.putByte(bytes[i]);
+        const bytes = number_to_uint8_array(num);
+        for (const byte of bytes) {
+            this.ctx.putByte(byte);
         }
     }
 
-    writeUIntData(num: UInt) {
-        const bi = new BInt(Number(num));
-        const bitcnt = bi.significantBitsCount();
-        bi.resize(bytesNeeded(bitcnt));
-        this.writeUIntDataHelper(bi);
+    writeUIntData(num: number) {
+        this.writeUIntDataHelper(BigInt(num), 'UInt');
     }
 
     writeIntData(snum: number) {
-        const neg = (snum < 0);
-        const num = neg ? -snum : snum;
-        const bi = new BInt(num);
-        const bitcnt = bi.significantBitsCount() + 1;
-        bi.resize(bytesNeeded(bitcnt));
-        if (neg) {
-            if (bi.byteCount() < 5) {
-                const sign_mask = 0x80 >> bi.byteCount();
-                bi.val[0] |= sign_mask;
-            } else {
-                bi.val[1] |= 128;
-            }
-        }
-        this.writeUIntDataHelper(bi);
+        this.writeUIntDataHelper(BigInt(snum), 'Int');
     }
 
     writeInt(n: Int) {
@@ -399,14 +460,14 @@ class ChainPackWriter {
         }
 
         this.ctx.putByte(PackingSchema.UInt);
-        this.writeUIntData(n);
+        this.writeUIntData(Number(n));
     }
 
     writeJSString(str: string) {
         this.ctx.putByte(PackingSchema.String);
         const pctx = new PackContext();
         pctx.writeStringUtf8(str);
-        this.writeUIntData(new UInt(pctx.length));
+        this.writeUIntData(pctx.length);
         for (let i = 0; i < pctx.length; i++) {
             this.ctx.putByte(pctx.data[i]);
         }
@@ -421,47 +482,43 @@ class ChainPackWriter {
     writeBlob(blob: ArrayBuffer) {
         this.ctx.putByte(PackingSchema.Blob);
         const arr = new Uint8Array(blob);
-        this.writeUIntData(new UInt(arr.length));
+        this.writeUIntData(arr.length);
         for (const element of arr) {
             this.ctx.putByte(element);
         }
     }
 
-    writeDateTime(dt: Date) {
+    writeDateTime(dt: DateTime) {
         this.ctx.putByte(PackingSchema.DateTime);
 
-        let msecs = dt.getTime() - SHV_EPOCH_MSEC;
+        let msecs = (dt.getTime() + (60_000 * (dt.utc_offset ?? 0))) - SHV_EPOCH_MSEC;
         if (msecs < 0) {
             throw new RangeError('DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.');
         }
-
-        const offset = (dt.getTimezoneOffset() / 15) & 0x7F;
 
         const ms = msecs % 1000;
         if (ms === 0) {
             msecs /= 1000;
         }
 
-        const bi = new BInt(msecs);
-        if (offset !== 0) {
-            bi.leftShift(7);
-            bi.val[bi.val.length - 1] |= offset;
+        let bi = BigInt(msecs);
+        if (dt.utc_offset !== undefined) {
+            bi <<= 7n;
+            bi |= BigInt((dt.utc_offset / 15) & 0x7F);
         }
 
-        bi.leftShift(2);
+        bi <<= 2n;
 
-        if (offset !== 0) {
-            bi.val[bi.val.length - 1] |= 1;
+        if (dt.utc_offset !== undefined) {
+            bi |= 1n;
         }
 
         if (ms === 0) {
-            bi.val[bi.val.length - 1] |= 2;
+            bi |= 2n;
         }
 
         // save as signed int
-        const bitcnt = bi.significantBitsCount() + 1;
-        bi.resize(bytesNeeded(bitcnt));
-        this.writeUIntDataHelper(bi);
+        this.writeUIntDataHelper(bi, 'UInt');
     }
 
     writeList(lst: RpcValue[]) {
@@ -523,6 +580,11 @@ const toChainPack = (value: RpcValue) => {
     return wr.ctx.buffer();
 };
 
+const fromChainPack = (buffer: ArrayBuffer) => {
+    const reader = new ChainPackReader(buffer);
+    return reader.read();
+};
+
 const ChainpackProtocolType = 1;
 
-export {toChainPack, ChainPackReader, ChainPackWriter, ChainpackProtocolType};
+export {toChainPack, fromChainPack, ChainPackReader, ChainPackWriter, ChainpackProtocolType};

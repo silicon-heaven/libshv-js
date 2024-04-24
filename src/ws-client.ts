@@ -1,13 +1,20 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack.ts';
-import {CponReader, CponProtocolType, toCpon} from './cpon.ts';
+import {type CponReader, CponProtocolType, toCpon} from './cpon.ts';
 import {RpcMessage, type RpcResponse} from './rpcmessage.ts';
-import {type RpcValue, type Null, type Int, UInt, type IMap, ShvMap} from './rpcvalue.ts';
+import {type RpcValue, type Null, type Int, type IMap, ShvMap} from './rpcvalue.ts';
 
 const dataToRpcValue = (buff: ArrayBuffer) => {
-    let rd: ChainPackReader | CponReader = new ChainPackReader(buff);
+    const rd: ChainPackReader | CponReader = new ChainPackReader(buff);
     rd.readUIntData();
     const proto = rd.ctx.getByte();
-    rd = proto === CponProtocolType ? new CponReader(rd.ctx) : new ChainPackReader(rd.ctx);
+    switch (proto) {
+        case ChainpackProtocolType:
+            break;
+        case CponProtocolType:
+            throw new Error('CPON protocol type is not supported anymore');
+        default:
+            throw new Error(`Unsupported protocol type ${proto}`);
+    }
     const rpc_val = rd.read();
     return rpc_val;
 };
@@ -23,7 +30,6 @@ type Subscription = {
 };
 
 type WsClientOptions = {
-    isUseCpon?: boolean;
     logDebug: (...args: any[]) => void;
     mountPoint?: string;
     user: string;
@@ -65,7 +71,6 @@ class WsClient {
     subscriptions: Subscription[] = [];
     websocket: WebSocket;
 
-    isUseCpon: WsClientOptions['isUseCpon'];
     logDebug: WsClientOptions['logDebug'];
     mountPoint: WsClientOptions['mountPoint'];
     user: WsClientOptions['user'];
@@ -78,7 +83,6 @@ class WsClient {
             throw new TypeError('No options object supplied');
         }
 
-        this.isUseCpon = options.isUseCpon ?? false;
         this.logDebug = options.logDebug ?? (() => {/* nothing */});
         this.mountPoint = options.mountPoint;
 
@@ -119,7 +123,7 @@ class WsClient {
 
         this.websocket.addEventListener('message', evt => {
             const rpc_val = dataToRpcValue(evt.data);
-            this.logDebug(`message received: ${new TextDecoder().decode(toCpon(rpc_val))}`);
+            this.logDebug(`message received: ${toCpon(rpc_val)}`);
             const rpc_msg = new RpcMessage(rpc_val);
 
             if (rpc_msg.isSignal()) {
@@ -141,7 +145,7 @@ class WsClient {
 
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
                     const cb = this.rpcHandlers[Number(requestId)];
-                    cb({result: rpc_msg.result()});
+                    cb(rpc_msg.resultOrError());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }
@@ -184,21 +188,17 @@ class WsClient {
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === 1) {
             this.logDebug('sending rpc message:', rpc_msg);
-            const msg_data = this.isUseCpon ? new Uint8Array(rpc_msg.toCpon()) : new Uint8Array(rpc_msg.toChainPack());
+            const msg_data = new Uint8Array(rpc_msg.toChainPack());
 
             const wr = new ChainPackWriter();
-            wr.writeUIntData(new UInt(msg_data.length + 1));
+            wr.writeUIntData(msg_data.length + 1);
             const dgram = new Uint8Array(wr.ctx.length + 1 + msg_data.length);
             let ix = 0;
             for (let i = 0; i < wr.ctx.length; i++) {
                 dgram[ix++] = wr.ctx.data[i];
             }
 
-            if (this.isUseCpon) {
-                dgram[ix++] = CponProtocolType;
-            } else {
-                dgram[ix++] = ChainpackProtocolType;
-            }
+            dgram[ix++] = ChainpackProtocolType;
 
             for (const msg_datum of msg_data) {
                 dgram[ix++] = msg_datum;

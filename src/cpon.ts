@@ -1,5 +1,5 @@
-import {type RpcValue, type RpcValueType, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt} from './rpcvalue.ts';
-import {PackContext, type UnpackContext} from './cpcontext.ts';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
+import {PackContext, UnpackContext} from './cpcontext.ts';
 
 const hexify = (byte: number) => {
     if (byte < 10) {
@@ -58,7 +58,7 @@ class CponReader {
 
     read(): RpcValue {
         let meta: MetaMap | undefined;
-        this.skipWhiteIsignificant();
+        this.skipWhitespace();
         let b = this.ctx.peekByte();
         if (b === '<'.codePointAt(0)) {
             meta = this.readMetaMap();
@@ -69,7 +69,7 @@ class CponReader {
             return ret;
         };
 
-        this.skipWhiteIsignificant();
+        this.skipWhitespace();
         b = this.ctx.peekByte();
         // console.log("CHAR:", b, String.fromCodePoint(b));
         // [0-9+-]
@@ -143,7 +143,7 @@ class CponReader {
         throw new TypeError('Malformed Cpon input.');
     }
 
-    skipWhiteIsignificant() {
+    skipWhitespace() {
         const SPACE = ' '.codePointAt(0)!;
         const SLASH = '/'.codePointAt(0)!;
         const STAR = '*'.codePointAt(0)!;
@@ -154,9 +154,6 @@ class CponReader {
             let b = this.ctx.peekByte();
             if (b < 1) {
                 return;
-            }
-            if (b <= SPACE) {
-                continue;
             }
 
             if (b > SPACE) {
@@ -292,7 +289,7 @@ class CponReader {
         // let epoch_sec = CponReader.timegm(year, month, mday, hour, min, sec);
         let epoch_msec = Date.UTC(year, month - 1, day, hour, min, sec, msec);
         epoch_msec -= utc_offset * 60_000;
-        return new Date(epoch_msec);
+        return withOffset(new Date(epoch_msec), utc_offset);
     }
 
     readCString() {
@@ -402,7 +399,7 @@ class CponReader {
         const lst = [];
         this.ctx.getByte(); // eat '['
         while (true) {
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const b = this.ctx.peekByte();
             if (b === ']'.codePointAt(0)) {
                 this.ctx.getByte();
@@ -501,37 +498,44 @@ class CponReader {
 
         mantisa = Number(this.readInt());
         b = this.ctx.peekByte();
-        switch (b) {
-            case 'u'.codePointAt(0): {
-                is_uint = true;
-                this.ctx.getByte();
-                break;
-            }
-            case '.'.codePointAt(0): {
-                is_decimal = true;
-                this.ctx.getByte();
-                const ix1 = this.ctx.index;
-                decimals = Number(this.readInt());
-                // if(n < 0)
-                //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
-                dec_cnt = this.ctx.index - ix1;
-                b = this.ctx.peekByte();
-                break;
-            }
-            case 'e'.codePointAt(0):
-            case 'E'.codePointAt(0): {
-                is_decimal = true;
-                this.ctx.getByte();
-                const ix1 = this.ctx.index;
-                exponent = Number(this.readInt());
-                if (ix1 === this.ctx.index) {
-                    throw new TypeError('Malformed number exponential part.');
+        (() => {
+            while (true) {
+                switch (b) {
+                    case 'u'.codePointAt(0): {
+                        is_uint = true;
+                        this.ctx.getByte();
+                        return;
+                    }
+                    case '.'.codePointAt(0): {
+                        is_decimal = true;
+                        this.ctx.getByte();
+                        const ix1 = this.ctx.index;
+                        decimals = Number(this.readInt());
+                        // if(n < 0)
+                        //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
+                        dec_cnt = this.ctx.index - ix1;
+                        b = this.ctx.peekByte();
+                        if (b >= 0) {
+                            continue;
+                        }
+                        return;
+                    }
+                    case 'e'.codePointAt(0):
+                    case 'E'.codePointAt(0): {
+                        is_decimal = true;
+                        this.ctx.getByte();
+                        const ix1 = this.ctx.index;
+                        exponent = Number(this.readInt());
+                        if (ix1 === this.ctx.index) {
+                            throw new TypeError('Malformed number exponential part.');
+                        }
+                        return;
+                    }
+                    default:
+                        return;
                 }
-                break;
             }
-            default:
-                break;
-        }
+        })();
         if (is_decimal) {
             for (let i = 0; i < dec_cnt; ++i) {
                 mantisa *= 10;
@@ -543,14 +547,14 @@ class CponReader {
         if (is_uint) {
             return new UInt(mantisa);
         }
-        return is_neg ? new UInt(-mantisa) : new Int(mantisa);
+        return new Int(is_neg ? -mantisa : mantisa);
     }
 
     private implReadMap<MapType extends MetaMap | ShvMap | IMap>(MapTypeCtor: new () => MapType, terminator: number) {
         const map = new MapTypeCtor();
         this.ctx.getByte(); // eat start
         while (true) {
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const b = this.ctx.peekByte();
             if (b === terminator) {
                 this.ctx.getByte();
@@ -561,16 +565,16 @@ class CponReader {
                 throw new TypeError('Map/IMap/MetaMap key can\'t have its own MetaData');
             }
 
-            this.skipWhiteIsignificant();
+            this.skipWhitespace();
             const val = this.read();
 
             if (map instanceof MetaMap && typeof key === 'string') {
                 map.value[key] = val;
-            } else if (map instanceof MetaMap && key instanceof Int) {
+            } else if (map instanceof MetaMap && (key instanceof UInt || key instanceof Int)) {
                 map.value[Number(key)] = val;
             } else if (map instanceof ShvMap && typeof key === 'string') {
                 map.value[key] = val;
-            } else if (map instanceof IMap && key instanceof Int) {
+            } else if (map instanceof IMap && (key instanceof UInt || key instanceof Int)) {
                 map.value[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
@@ -593,7 +597,7 @@ class CponWriter {
         }
 
         switch (true) {
-            case rpc_val === null:
+            case rpc_val === undefined:
                 this.ctx.writeStringUtf8('null');
                 break;
             case typeof rpc_val === 'boolean':
@@ -700,21 +704,21 @@ class CponWriter {
         this.ctx.writeStringUtf8('"');
     }
 
-    writeDateTime(dt: Date) {
+    writeDateTime(dt: DateTime) {
         if (!dt) {
             this.ctx.writeStringUtf8('d""');
             return;
         }
         const epoch_msec = dt.getTime();
-        let utc_offset = dt.getTimezoneOffset();
-        const msec = epoch_msec + (60_000 * utc_offset);
-        let s = new Date(msec).toISOString();
-        const rtrim = (msec % 1000) ? 1 : 5;
+        let utc_offset = dt.utc_offset;
+        const local_msec = epoch_msec + (60_000 * (utc_offset ?? 0));
+        let s = new Date(local_msec).toISOString();
+        const rtrim = (local_msec % 1000) ? 1 : 5;
         this.ctx.writeStringUtf8('d"');
         for (let i = 0; i < s.length - rtrim; i++) {
             this.ctx.putByte(s.codePointAt(i)!);
         }
-        if (!utc_offset) {
+        if (utc_offset === undefined || utc_offset === 0) {
             this.ctx.writeStringUtf8('Z');
         } else {
             if (utc_offset < 0) {
@@ -861,9 +865,18 @@ class CponWriter {
 const toCpon = (value: RpcValue) => {
     const wr = new CponWriter();
     wr.write(value);
-    return wr.ctx.buffer();
+    return new TextDecoder().decode(wr.ctx.buffer());
+};
+
+const fromCpon = (str: string | Uint8Array) => {
+    if (typeof str === 'string') {
+        str = new TextEncoder().encode(str);
+    }
+
+    const rd = new CponReader(new UnpackContext(str.buffer));
+    return rd.read();
 };
 
 const CponProtocolType = 2;
 
-export {utf8ToString, CponWriter, CponReader, CponProtocolType, toCpon};
+export {utf8ToString, CponWriter, CponReader, CponProtocolType, toCpon, fromCpon};

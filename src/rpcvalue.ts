@@ -50,12 +50,8 @@ class Decimal {
     mantisa: number;
     exponent: number;
     constructor(mantisa: number, exponent: number) {
-        if (Number.isInteger(exponent)) {
-            throw new TypeError('Decimal: exponent must be integral');
-        }
-
-        if (mantisa < -10 || mantisa > 10) {
-            throw new Error('Decimal: mantisa must be between -10 and 10');
+        if (!Number.isInteger(exponent)) {
+            throw new TypeError(`Decimal: exponent must be integral (${exponent})`);
         }
 
         this.mantisa = mantisa;
@@ -67,7 +63,12 @@ export type Null = undefined;
 export type Bool = boolean;
 export type Blob = ArrayBuffer;
 export type ShvString = string;
-export type DateTime = Date;
+export type DateTime = Date & {utc_offset?: number};
+const withOffset = (date: Date, utc_offset?: number) => {
+    const cloned_date: DateTime = new Date(date.getTime());
+    cloned_date.utc_offset = utc_offset;
+    return cloned_date;
+};
 export type List = RpcValue[];
 
 type ShvMapDefaultType = Record<string, RpcValue | undefined>;
@@ -107,4 +108,4 @@ class RpcValueWithMetaData {
 
 export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-export {Decimal, Double, Int, IMap, MetaMap, RpcValueWithMetaData, ShvMap, UInt};
+export {Decimal, Double, Int, IMap, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset};
