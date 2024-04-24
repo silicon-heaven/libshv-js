@@ -1,7 +1,7 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack.ts';
 import {CponReader, CponProtocolType, toCpon} from './cpon.ts';
 import {RpcMessage, type RpcResponse} from './rpcmessage.ts';
-import {type RpcValue, UInt, ShvMap} from './rpcvalue.ts';
+import {type RpcValue, type Null, type Int, UInt, type IMap, ShvMap} from './rpcvalue.ts';
 
 const dataToRpcValue = (buff: ArrayBuffer) => {
     let rd: ChainPackReader | CponReader = new ChainPackReader(buff);
@@ -32,6 +32,32 @@ type WsClientOptions = {
     onConnected: () => void;
     onRequest: (rpc_msg: RpcMessage) => void;
 };
+
+type LsResult = string[];
+export enum DirFlags {
+    Reserved = 1,
+    Getter = 2,
+    Setter = 4,
+    LargeResultHint = 8,
+    NotIdempotent = 16,
+    RequiresClientId = 32,
+}
+export const DIR_NAME = 1;
+export const DIR_FLAGS = 2;
+export const DIR_PARAM = 3;
+export const DIR_RESULT = 4;
+export const DIR_ACCESS = 5;
+export const DIR_SIGNALS = 6;
+export const DIR_EXTRA = 63;
+type DirResult = Array<IMap<{
+    [DIR_NAME]: string;
+    [DIR_FLAGS]: Int<DirFlags>;
+    [DIR_PARAM]: string | Null;
+    [DIR_RESULT]: string | Null;
+    [DIR_ACCESS]: Int;
+    [DIR_SIGNALS]: ShvMap<Record<string, string | Null>>;
+    [DIR_EXTRA]: ShvMap;
+}>>;
 
 class WsClient {
     requestId = 1;
@@ -132,6 +158,9 @@ class WsClient {
         });
     }
 
+    callRpcMethod(shv_path: string | undefined, method: 'dir', params?: RpcValue): Promise<RpcResponse<DirResult>>;
+    callRpcMethod(shv_path: string | undefined, method: 'ls', params?: RpcValue): Promise<RpcResponse<LsResult>>;
+    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<RpcResponse>;
     callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue) {
         const rq = new RpcMessage();
         const rq_id = this.requestId++;
@@ -198,4 +227,4 @@ class WsClient {
     }
 }
 
-export default WsClient;
+export {WsClient};

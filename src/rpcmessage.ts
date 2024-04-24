@@ -110,8 +110,8 @@ class RpcMessage {
     }
 }
 
-export type RpcResponse = {
-    result?: RpcValue;
+export type RpcResponse<T = RpcValue> = {
+    result: T;
 };
 
 export {RpcMessage};
