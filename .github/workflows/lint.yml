@@ -30,4 +30,4 @@ jobs:
           deno-version: vx.x.x
 
       - name: Run xo
-        run: deno run --allow-read --allow-write --allow-net --allow-sys --allow-env npm:xo --reporter unix src/*
+        run: deno run --allow-read --allow-write --allow-net --allow-sys --allow-env npm:xo --reporter unix src/* test.ts
