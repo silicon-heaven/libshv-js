@@ -634,6 +634,7 @@ class CponWriter {
                 this.writeDateTime(rpc_val);
                 break;
             default:
+                console.log('Can\'t serialize rpc value', rpc_val);
                 throw new Error('Can\'t serialize rpc value');
         }
     }
