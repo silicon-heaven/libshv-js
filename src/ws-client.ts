@@ -30,7 +30,7 @@ type Subscription = {
 };
 
 type WsClientOptions = {
-    logDebug: (...args: any[]) => void;
+    logDebug: (...args: string[]) => void;
     mountPoint?: string;
     user: string;
     password: string;
@@ -187,7 +187,7 @@ class WsClient {
 
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === 1) {
-            this.logDebug('sending rpc message:', rpc_msg);
+            this.logDebug('sending rpc message:', toCpon(rpc_msg));
             const msg_data = new Uint8Array(rpc_msg.toChainPack());
 
             const wr = new ChainPackWriter();
