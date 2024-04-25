@@ -110,9 +110,9 @@ class RpcMessage {
     }
 }
 
-const ERROR_CODE = 1;
-const ERROR_MESSAGE = 2;
-const ERROR_DATA = 3;
+export const ERROR_CODE = 1;
+export const ERROR_MESSAGE = 2;
+export const ERROR_DATA = 3;
 
 enum ErrorCode {
     InvalidRequest = 1,
@@ -131,8 +131,8 @@ enum ErrorCode {
 
 type ErrorMap = IMap<{
     [ERROR_CODE]: Int<ErrorCode>;
-    [ERROR_MESSAGE]: string | undefined;
-    [ERROR_DATA]: RpcValue | undefined;
+    [ERROR_MESSAGE]?: string;
+    [ERROR_DATA]?: RpcValue;
 }>;
 
 class RpcError {

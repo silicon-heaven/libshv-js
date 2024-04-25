@@ -1,7 +1,9 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack.ts';
 import {type CponReader, CponProtocolType, toCpon} from './cpon.ts';
-import {RpcMessage, type RpcResponse} from './rpcmessage.ts';
-import {type RpcValue, type Null, type Int, type IMap, ShvMap} from './rpcvalue.ts';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcError, RpcMessage, type RpcResponse} from './rpcmessage.ts';
+import {type RpcValue, type Null, Int, IMap, ShvMap} from './rpcvalue.ts';
+
+const DEFAULT_TIMEOUT = 5000;
 
 const dataToRpcValue = (buff: ArrayBuffer) => {
     const rd: ChainPackReader | CponReader = new ChainPackReader(buff);
@@ -67,7 +69,11 @@ type DirResult = Array<IMap<{
 
 class WsClient {
     requestId = 1;
-    rpcHandlers: RpcResponseCallback[] = [];
+    rpcHandlers: Array<{
+        resolve: RpcResponseCallback;
+        timeout_handle: number;
+    }> = [];
+
     subscriptions: Subscription[] = [];
     websocket: WebSocket;
 
@@ -144,8 +150,9 @@ class WsClient {
                 }
 
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
-                    const cb = this.rpcHandlers[Number(requestId)];
-                    cb(rpc_msg.resultOrError());
+                    const handler = this.rpcHandlers[Number(requestId)];
+                    clearTimeout(handler.timeout_handle);
+                    handler.resolve(rpc_msg.resultOrError());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }
@@ -179,7 +186,12 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new Promise<RpcResponse>(resolve => {
-            this.rpcHandlers[rq_id] = resolve;
+            this.rpcHandlers[rq_id] = {resolve, timeout_handle: setTimeout(() => {
+                resolve(new RpcError(new IMap({
+                    [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
+                    [ERROR_MESSAGE]: `Shv call timeout after: ${DEFAULT_TIMEOUT} msec.`,
+                })));
+            }, DEFAULT_TIMEOUT)};
         });
 
         return promise;
