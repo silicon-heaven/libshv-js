@@ -36,6 +36,7 @@ type WsClientOptions = {
     mountPoint?: string;
     user: string;
     password: string;
+    timeout?: number;
     wsUri: string;
     onConnected: () => void;
     onRequest: (rpc_msg: RpcMessage) => void;
@@ -83,6 +84,7 @@ class WsClient {
     password: WsClientOptions['password'];
     onConnected: WsClientOptions['onConnected'];
     onRequest: WsClientOptions['onRequest'];
+    timeout: WsClientOptions['timeout'];
 
     constructor(options: WsClientOptions) {
         if (typeof options !== 'object') {
@@ -100,6 +102,8 @@ class WsClient {
 
         this.onConnected = options.onConnected ?? (() => {/* nothing */});
         this.onRequest = options.onRequest ?? (() => {/* nothing */});
+
+        this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
         this.websocket.addEventListener('open', () => {
             this.logDebug('CONNECTED');
@@ -189,9 +193,9 @@ class WsClient {
             this.rpcHandlers[rq_id] = {resolve, timeout_handle: setTimeout(() => {
                 resolve(new RpcError(new IMap({
                     [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
-                    [ERROR_MESSAGE]: `Shv call timeout after: ${DEFAULT_TIMEOUT} msec.`,
+                    [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
                 })));
-            }, DEFAULT_TIMEOUT)};
+            }, this.timeout)};
         });
 
         return promise;
