@@ -123,8 +123,8 @@ class WsClient {
 
         this.websocket.addEventListener('message', evt => {
             const rpc_val = dataToRpcValue(evt.data);
-            this.logDebug(`message received: ${toCpon(rpc_val)}`);
             const rpc_msg = new RpcMessage(rpc_val);
+            this.logDebug(`message received: ${rpc_msg.toCpon()}`);
 
             if (rpc_msg.isSignal()) {
                 for (const sub of this.subscriptions) {
@@ -187,7 +187,7 @@ class WsClient {
 
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === 1) {
-            this.logDebug('sending rpc message:', toCpon(rpc_msg));
+            this.logDebug('sending rpc message:', rpc_msg.toCpon());
             const msg_data = new Uint8Array(rpc_msg.toChainPack());
 
             const wr = new ChainPackWriter();
