@@ -22,5 +22,8 @@
     "./rpcmessage.ts": "./src/rpcmessage.ts",
     "./rpcvalue.ts": "./src/rpcvalue.ts",
     "./ws-client.ts": "./src/ws-client.ts"
+  },
+  "devDependencies": {
+    "xo": "^0.58.0"
   }
 }
