@@ -23,7 +23,7 @@ const dataToRpcValue = (buff: ArrayBuffer) => {
 
 type SubscriptionCallback = (path: string, method: string, param?: RpcValue) => void;
 
-type RpcResponseCallback = (rpc_msg: RpcResponse) => void;
+type RpcResponseResolver = (rpc_msg: RpcResponse) => void;
 
 type Subscription = {
     path: string;
@@ -70,7 +70,7 @@ type DirResult = Array<IMap<{
 class WsClient {
     requestId = 1;
     rpcHandlers: Array<{
-        resolve: RpcResponseCallback;
+        resolve: RpcResponseResolver;
         timeout_handle: number;
     }> = [];
 
