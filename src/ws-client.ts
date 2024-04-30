@@ -190,7 +190,7 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new Promise<RpcResponse>(resolve => {
-            this.rpcHandlers[rq_id] = {resolve, timeout_handle: setTimeout(() => {
+            this.rpcHandlers[rq_id] = {resolve, timeout_handle: self.setTimeout(() => {
                 resolve(new RpcError(new IMap({
                     [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
