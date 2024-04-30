@@ -24,6 +24,7 @@
     "./ws-client.ts": "./src/ws-client.ts"
   },
   "devDependencies": {
+    "typescript": "^5.4.5",
     "xo": "^0.58.0"
   }
 }
