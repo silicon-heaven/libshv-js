@@ -1,4 +1,4 @@
-import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
+import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
 import {PackContext, UnpackContext} from './cpcontext.ts';
 
 const hexify = (byte: number) => {
@@ -586,7 +586,8 @@ class CponReader {
 
 class CponWriter {
     ctx: PackContext;
-    constructor() {
+    nestLevel = 0;
+    constructor(private readonly indentString?: string) {
         this.ctx = new PackContext();
     }
 
@@ -745,19 +746,31 @@ class CponWriter {
 
     writeMeta(map: MetaMap) {
         this.ctx.writeStringUtf8('<');
+        this.increaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.writeMapContent(map);
+        this.decreaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.ctx.writeStringUtf8('>');
     }
 
     writeIMap(map: IMap) {
         this.ctx.writeStringUtf8('i{');
+        this.increaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.writeMapContent(map);
+        this.decreaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.ctx.writeStringUtf8('}');
     }
 
     writeMap(map: ShvMap) {
         this.ctx.writeStringUtf8('{');
+        this.increaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.writeMapContent(map);
+        this.decreaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         this.ctx.writeStringUtf8('}');
     }
 
@@ -769,6 +782,7 @@ class CponWriter {
             }
             if (!first) {
                 this.ctx.putByte(','.codePointAt(0)!);
+                this.doIndentIfNotOneliner(map);
             }
             first = false;
 
@@ -799,12 +813,17 @@ class CponWriter {
 
     writeList(lst: RpcValue[]) {
         this.ctx.putByte('['.codePointAt(0)!);
+        this.increaseIndentIfNotOneLiner(lst);
+        this.doIndentIfNotOneliner(lst);
         for (const [i, element] of lst.entries()) {
             if (i > 0) {
                 this.ctx.putByte(','.codePointAt(0)!);
+                this.doIndentIfNotOneliner(lst);
             }
             this.write(element);
         }
+        this.decreaseIndentIfNotOneLiner(lst);
+        this.doIndentIfNotOneliner(lst);
         this.ctx.putByte(']'.codePointAt(0)!);
     }
 
@@ -861,10 +880,39 @@ class CponWriter {
             this.ctx.putByte(str.codePointAt(i)!);
         }
     }
+
+    private doIndentIfNotOneliner(map: MetaMap | ShvMap | IMap | List) {
+        if (this.indentString !== undefined && !this.isOneLiner(map)) {
+            this.ctx.putByte('\n'.codePointAt(0)!);
+            this.ctx.writeStringUtf8(this.indentString.repeat(this.nestLevel));
+        }
+    }
+
+    private isOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        const keyThreshold = Array.isArray(value) ? 10 : 5;
+
+        if (Array.isArray(value)) {
+            return value.length <= keyThreshold && !(value.some(x => Array.isArray(x) || x instanceof ShvMap || x instanceof IMap));
+        }
+
+        return Object.keys(value.value).length <= keyThreshold && !(Object.values(value.value).some(x => Array.isArray(x) || x instanceof ShvMap || x instanceof IMap));
+    }
+
+    private increaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (!this.isOneLiner(value)) {
+            this.nestLevel++;
+        }
+    }
+
+    private decreaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (!this.isOneLiner(value)) {
+            this.nestLevel--;
+        }
+    }
 }
 
-const toCpon = (value: RpcValue) => {
-    const wr = new CponWriter();
+const toCpon = (value: RpcValue, indentString?: string) => {
+    const wr = new CponWriter(indentString);
     wr.write(value);
     return new TextDecoder().decode(wr.ctx.buffer());
 };
