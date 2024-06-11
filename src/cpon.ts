@@ -745,36 +745,21 @@ class CponWriter {
     }
 
     writeMeta(map: MetaMap) {
-        this.ctx.writeStringUtf8('<');
-        this.increaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.writeMapContent(map);
-        this.decreaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.ctx.writeStringUtf8('>');
+        this.writeMapContent(map, '<', '>');
     }
 
     writeIMap(map: IMap) {
-        this.ctx.writeStringUtf8('i{');
-        this.increaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.writeMapContent(map);
-        this.decreaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.ctx.writeStringUtf8('}');
+        this.writeMapContent(map, 'i{', '}');
     }
 
     writeMap(map: ShvMap) {
-        this.ctx.writeStringUtf8('{');
-        this.increaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.writeMapContent(map);
-        this.decreaseIndentIfNotOneLiner(map);
-        this.doIndentIfNotOneliner(map);
-        this.ctx.writeStringUtf8('}');
+        this.writeMapContent(map, '{', '}');
     }
 
-    writeMapContent(map: MetaMap | ShvMap | IMap) {
+    writeMapContent(map: MetaMap | ShvMap | IMap, delimiterStart: string, delimiterEnd: string) {
+        this.ctx.writeStringUtf8(delimiterStart);
+        this.increaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
         let first = true;
         for (const [key, value] of Object.entries(map.value)) {
             if (value === undefined) {
@@ -809,6 +794,10 @@ class CponWriter {
             this.ctx.writeStringUtf8(':');
             this.write(value);
         }
+
+        this.decreaseIndentIfNotOneLiner(map);
+        this.doIndentIfNotOneliner(map);
+        this.ctx.writeStringUtf8(delimiterEnd);
     }
 
     writeList(lst: RpcValue[]) {
