@@ -34,8 +34,9 @@ type Subscription = {
 type WsClientOptions = {
     logDebug: (...args: string[]) => void;
     mountPoint?: string;
-    user: string;
+    user?: string;
     password: string;
+    loginType?: 'PLAIN' | 'AZURE';
     timeout?: number;
     wsUri: string;
     onConnected: () => void;
@@ -80,8 +81,9 @@ class WsClient {
 
     logDebug: WsClientOptions['logDebug'];
     mountPoint: WsClientOptions['mountPoint'];
-    user: WsClientOptions['user'];
+    user?: WsClientOptions['user'];
     password: WsClientOptions['password'];
+    loginType: WsClientOptions['loginType'];
     onConnected: WsClientOptions['onConnected'];
     onRequest: WsClientOptions['onRequest'];
     timeout: WsClientOptions['timeout'];
@@ -94,8 +96,9 @@ class WsClient {
         this.logDebug = options.logDebug ?? (() => {/* nothing */});
         this.mountPoint = options.mountPoint;
 
-        this.user = options.user;
+        this.user = options.user ?? '';
         this.password = options.password;
+        this.loginType = options.loginType ?? 'PLAIN';
 
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
@@ -111,7 +114,7 @@ class WsClient {
                 const params = new ShvMap({
                     login: new ShvMap({
                         password: this.password,
-                        type: 'PLAIN',
+                        type: this.loginType,
                         user: this.user,
                     }),
                     options: new ShvMap({
