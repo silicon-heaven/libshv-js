@@ -87,7 +87,7 @@ class RpcMessage {
 
     resultOrError() {
         if (this.value.value[KeyError] !== undefined) {
-            return new RpcError(this.value.value[KeyResult] as ErrorMap);
+            return new RpcError(this.value.value[KeyError] as ErrorMap);
         }
 
         return this.value.value[KeyResult];
