@@ -1,6 +1,6 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack.ts';
 import {type CponReader, CponProtocolType, toCpon} from './cpon.ts';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcError, RpcMessage, type RpcResponse} from './rpcmessage.ts';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcError, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage.ts';
 import {type RpcValue, type Null, Int, IMap, ShvMap} from './rpcvalue.ts';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -194,7 +194,7 @@ class WsClient {
 
         const promise = new Promise<RpcResponse>(resolve => {
             this.rpcHandlers[rq_id] = {resolve, timeout_handle: self.setTimeout(() => {
-                resolve(new RpcError(new IMap({
+                resolve(new MethodCallTimeout(new IMap({
                     [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
                 })));

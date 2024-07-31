@@ -27,9 +27,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: vx.x.x
-
+      - name: Install tsc
+        run: npm install
       - name: Run xo
-        run: deno run --allow-read --allow-write --allow-net --allow-sys --allow-env npm:xo --reporter unix src/* test.ts
+        run: npx xo --reporter unix src/* test.ts
