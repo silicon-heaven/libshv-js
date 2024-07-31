@@ -46,6 +46,8 @@ class RpcError extends Error {
     }
 }
 
+export class ProtocolError extends Error {}
+
 export class InvalidRequest extends RpcError {}
 export class MethodNotFound extends RpcError {}
 export class InvalidParams extends RpcError {}
@@ -135,6 +137,15 @@ class RpcMessage {
 
     resultOrError() {
         if (this.value.value[KeyError] !== undefined) {
+            if (!(this.value.value[KeyError] instanceof IMap)) {
+                return new ProtocolError('Response had an error, but this error was not a map');
+            }
+
+            const error_map = this.value.value[KeyError];
+            if (error_map.value[ERROR_CODE] === undefined) {
+                return new ProtocolError('Response had an error, but this error did not contain at least an error code');
+            }
+
             const ErrorType = (() => {
                 switch ((this.value.value[KeyError] as ErrorMap).value[ERROR_CODE].value) {
                     case ErrorCode.InvalidRequest: return InvalidRequest;
@@ -155,7 +166,11 @@ class RpcMessage {
             return new ErrorType(this.value.value[KeyError] as ErrorMap);
         }
 
-        return this.value.value[KeyResult];
+        if (this.value.value[KeyResult] !== undefined) {
+            return this.value.value[KeyResult];
+        }
+
+        return new ProtocolError('Response included neither result nor error');
     }
 
     setResult(result: RpcValue) {
