@@ -40,6 +40,7 @@ type WsClientOptions = {
     timeout?: number;
     wsUri: string;
     onConnected: () => void;
+    onDisconnected: () => void;
     onRequest: (rpc_msg: RpcMessage) => void;
 };
 
@@ -85,6 +86,7 @@ class WsClient {
     password: WsClientOptions['password'];
     loginType: WsClientOptions['loginType'];
     onConnected: WsClientOptions['onConnected'];
+    onDisconnected: WsClientOptions['onDisconnected'];
     onRequest: WsClientOptions['onRequest'];
     timeout: WsClientOptions['timeout'];
 
@@ -104,6 +106,7 @@ class WsClient {
         this.websocket.binaryType = 'arraybuffer';
 
         this.onConnected = options.onConnected ?? (() => {/* nothing */});
+        this.onDisconnected = options.onDisconnected ?? (() => {/* nothing */});
         this.onRequest = options.onRequest ?? (() => {/* nothing */});
 
         this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
@@ -132,6 +135,7 @@ class WsClient {
 
         this.websocket.addEventListener('close', () => {
             this.logDebug('DISCONNECTED');
+            this.onDisconnected();
         });
 
         this.websocket.addEventListener('message', evt => {
@@ -169,10 +173,6 @@ class WsClient {
         this.websocket.addEventListener('error', evt => {
             console.log('WebSocket ERROR', evt);
             this.logDebug('WebSocket ERROR');
-        });
-
-        this.websocket.addEventListener('close', evt => {
-            this.logDebug(`socket close code: ${evt.code}`);
         });
     }
 
