@@ -1,7 +1,7 @@
-import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack.ts';
-import {type CponReader, CponProtocolType, toCpon} from './cpon.ts';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcError, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage.ts';
-import {type RpcValue, type Null, Int, IMap, ShvMap} from './rpcvalue.ts';
+import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack';
+import {type CponReader, CponProtocolType, toCpon} from './cpon';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcError, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage';
+import {type RpcValue, type Null, Int, IMap, ShvMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
 

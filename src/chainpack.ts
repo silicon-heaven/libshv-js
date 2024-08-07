@@ -1,6 +1,6 @@
-import {utf8ToString} from './cpon.ts';
-import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
-import {UnpackContext, PackContext} from './cpcontext.ts';
+import {utf8ToString} from './cpon';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue';
+import {UnpackContext, PackContext} from './cpcontext';
 
 enum PackingSchema {
     IntThreshold = 64,

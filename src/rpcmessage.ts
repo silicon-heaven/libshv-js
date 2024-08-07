@@ -1,6 +1,6 @@
-import {IMap, Int, MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue.ts';
-import {toCpon} from './cpon.ts';
-import {toChainPack} from './chainpack.ts';
+import {IMap, Int, MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
+import {toCpon} from './cpon';
+import {toChainPack} from './chainpack';
 
 const TagRequestId = 8;
 const TagShvPath = 9;
