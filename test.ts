@@ -1,6 +1,6 @@
-import {toChainPack, fromChainPack} from './src/chainpack.ts';
-import {toCpon, fromCpon} from './src/cpon.ts';
-import {type DateTime} from './src/rpcvalue.ts';
+import {toChainPack, fromChainPack} from './src/chainpack';
+import {toCpon, fromCpon} from './src/cpon';
+import {type DateTime} from './src/rpcvalue';
 
 const checkEq = (e1: string | number, e2: string | number) => {
     if (e1 !== e2) {

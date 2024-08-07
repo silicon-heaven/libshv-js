@@ -1,5 +1,5 @@
-import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue.ts';
-import {PackContext, UnpackContext} from './cpcontext.ts';
+import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue';
+import {PackContext, UnpackContext} from './cpcontext';
 
 const hexify = (byte: number) => {
     if (byte < 10) {
