@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: vx.x.x
+
+      - name: Compile
+        run: npx tsc
 
       - name: Run tests
-        run: deno run test.ts
+        run: node test.js
