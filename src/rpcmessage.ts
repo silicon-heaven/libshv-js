@@ -166,7 +166,7 @@ class RpcMessage {
             return new ErrorType(this.value.value[KeyError] as ErrorMap);
         }
 
-        if (this.value.value[KeyResult] !== undefined) {
+        if (Object.hasOwn(this.value.value.hasOwnProperty, KeyResult)) {
             return this.value.value[KeyResult];
         }
 
