@@ -135,6 +135,7 @@ class WsClient {
 
         this.websocket.addEventListener('close', () => {
             this.logDebug('DISCONNECTED');
+            this.subscriptions.length = 0;
             this.onDisconnected();
         });
 
