@@ -26,6 +26,7 @@ type SubscriptionCallback = (path: string, method: string, param?: RpcValue) => 
 type RpcResponseResolver = (rpc_msg: RpcResponse) => void;
 
 type Subscription = {
+    subscriber: string;
     path: string;
     method: string;
     callback: SubscriptionCallback;
@@ -135,6 +136,7 @@ class WsClient {
 
         this.websocket.addEventListener('close', () => {
             this.logDebug('DISCONNECTED');
+            this.subscriptions.length = 0;
             this.onDisconnected();
         });
 
@@ -227,17 +229,42 @@ class WsClient {
         }
     }
 
-    subscribe(path: string, method: string, callback: SubscriptionCallback) {
-        this.callRpcMethod('.broker/app', 'subscribe', new ShvMap({
-            method, path,
-        })).catch(() => {
-            this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
-        });
-
+    subscribe(subscriber: string, path: string, method: string, callback: SubscriptionCallback) {
+        if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.method === method)) {
+            this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
+            return;
+        }
+        // If this path:method has not been subscribed on the broker, do it now
+        if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
+            this.callRpcMethod('.broker/app', 'subscribe', new ShvMap({
+                method, path,
+            })).catch(() => {
+                this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
+            });
+        }
         this.subscriptions.push({
+            subscriber,
             path,
             method,
             callback,
+        });
+    }
+
+    unsubscribe(subscriber: string, path: string, method: string) {
+        const idx = this.subscriptions.findIndex(val => val.subscriber === subscriber && val.path === path && val.method === method);
+        if (idx === -1) {
+            this.logDebug(`No such subscription ${path}:${method} for subscriber ${subscriber}`);
+            return;
+        }
+        this.subscriptions.splice(idx, 1);
+        // Unsubscribe on the broker only if there are no other subscriptions of this path:method
+        if (this.subscriptions.some(val => val.path === path && val.method === method)) {
+            return;
+        }
+        this.callRpcMethod('.broker/app', 'unsubscribe', new ShvMap({
+            method, path,
+        })).catch(() => {
+            this.logDebug(`Couldn't unsubscribe ${path}, ${method}`);
         });
     }
 
