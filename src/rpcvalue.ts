@@ -71,15 +71,19 @@ const withOffset = (date: Date, utc_offset?: number) => {
 };
 export type List = RpcValue[];
 
-type ShvMapDefaultType = Record<string, RpcValue | undefined>;
-class ShvMap<T extends ShvMapDefaultType = ShvMapDefaultType> {
-    constructor(public value: T = {} as T) {}
-}
+const shvMapType = Symbol('shvMapType');
 
-type IMapDefaultType = Record<number, RpcValue | undefined>;
-class IMap<T extends IMapDefaultType = IMapDefaultType> {
-    constructor(public value: T = {} as T) {}
-}
+type IMap<T extends Record<number, RpcValue> = Record<number, any>> = {
+    [Key in keyof T]: T[Key];
+} & {
+    [shvMapType]: 'imap';
+};
+
+type ShvMap<T extends Record<string, RpcValue> = Record<string, any>> = {
+    [Key in keyof T]: T[Key];
+} & {
+    [shvMapType]: 'map';
+};
 
 export type RpcValueType =
     Null |
@@ -95,12 +99,30 @@ export type RpcValueType =
     ShvMap |
     IMap;
 
-class MetaMap {
-    value: Record<number | string, RpcValue | undefined>;
-    constructor(obj?: Record<number | string, RpcValue | undefined>) {
-        this.value = obj ?? {};
-    }
-}
+type MetaMap<T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>> = {
+    [Key in keyof T]: T[Key];
+} & {
+    [shvMapType]: 'metamap';
+};
+
+const isShvMap = (x: RpcValue): x is ShvMap => typeof x === 'object' && (x as ShvMap)[shvMapType] === 'map';
+
+const isIMap = (x: RpcValue): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
+
+const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>>(x: T = {} as T): MetaMap<T> => ({
+    ...x,
+    [shvMapType]: 'metamap',
+});
+
+const makeIMap = <T extends Record<number, RpcValue> = Record<number, RpcValue>>(x: T = {} as T): IMap<T> => ({
+    ...x,
+    [shvMapType]: 'imap',
+});
+
+const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>>(x: T = {} as T): ShvMap<T> => ({
+    ...x,
+    [shvMapType]: 'map',
+});
 
 class RpcValueWithMetaData {
     constructor(public value: RpcValueType, public meta: MetaMap) {}
@@ -108,4 +130,4 @@ class RpcValueWithMetaData {
 
 export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-export {Decimal, Double, Int, IMap, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset};
+export {shvMapType, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isShvMap};

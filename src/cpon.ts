@@ -1,4 +1,4 @@
-import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue';
+import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
 const hexify = (byte: number) => {
@@ -412,15 +412,15 @@ class CponReader {
     }
 
     readMetaMap() {
-        return this.implReadMap(MetaMap, '>'.codePointAt(0)!);
+        return this.implReadMap('metamap', '>'.codePointAt(0)!);
     }
 
     readMap() {
-        return this.implReadMap(ShvMap, '}'.codePointAt(0)!);
+        return this.implReadMap('map', '}'.codePointAt(0)!);
     }
 
     readIMap() {
-        return this.implReadMap(IMap, '}'.codePointAt(0)!);
+        return this.implReadMap('imap', '}'.codePointAt(0)!);
     }
 
     readInt() {
@@ -550,8 +550,13 @@ class CponReader {
         return new Int(is_neg ? -mantisa : mantisa);
     }
 
-    private implReadMap<MapType extends MetaMap | ShvMap | IMap>(MapTypeCtor: new () => MapType, terminator: number) {
-        const map = new MapTypeCtor();
+    private implReadMap(map_type: 'map', terminator: number): ShvMap;
+    private implReadMap(map_type: 'imap', terminator: number): IMap;
+    private implReadMap(map_type: 'metamap', terminator: number): MetaMap;
+    private implReadMap(map_type: 'map' | 'imap' | 'metamap', terminator: number) {
+        const map: MetaMap | ShvMap | IMap = {
+            [shvMapType]: map_type,
+        };
         this.ctx.getByte(); // eat start
         while (true) {
             this.skipWhitespace();
@@ -568,14 +573,14 @@ class CponReader {
             this.skipWhitespace();
             const val = this.read();
 
-            if (map instanceof MetaMap && typeof key === 'string') {
-                map.value[key] = val;
-            } else if (map instanceof MetaMap && (key instanceof UInt || key instanceof Int)) {
-                map.value[Number(key)] = val;
-            } else if (map instanceof ShvMap && typeof key === 'string') {
-                map.value[key] = val;
-            } else if (map instanceof IMap && (key instanceof UInt || key instanceof Int)) {
-                map.value[Number(key)] = val;
+            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || key instanceof Int)) {
+                map[Number(key)] = val;
+            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || key instanceof Int)) {
+                map[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
             }
@@ -625,14 +630,18 @@ class CponWriter {
             case Array.isArray(rpc_val):
                 this.writeList(rpc_val);
                 break;
-            case rpc_val instanceof IMap:
-                this.writeIMap(rpc_val);
-                break;
-            case rpc_val instanceof ShvMap:
-                this.writeMap(rpc_val);
-                break;
             case rpc_val instanceof Date:
                 this.writeDateTime(rpc_val);
+                break;
+            case typeof rpc_val === 'object':
+                switch (rpc_val[shvMapType]) {
+                    case 'imap':
+                        this.writeIMap(rpc_val);
+                        break;
+                    case 'map':
+                        this.writeMap(rpc_val);
+                        break;
+                }
                 break;
             default:
                 console.log('Can\'t serialize rpc value', rpc_val);
@@ -761,7 +770,7 @@ class CponWriter {
         this.increaseIndentIfNotOneLiner(map);
         this.doIndentIfNotOneliner(map);
         let first = true;
-        for (const [key, value] of Object.entries(map.value)) {
+        for (const [key, value] of Object.entries(map)) {
             if (value === undefined) {
                 continue;
             }
@@ -771,14 +780,14 @@ class CponWriter {
             }
             first = false;
 
-            if (map instanceof IMap) {
+            if (map[shvMapType] === 'imap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
                 this.writeInt(new Int(int_key));
-            } else if (map instanceof MetaMap) {
+            } else if (map[shvMapType] === 'metamap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
                     this.ctx.putByte('"'.codePointAt(0)!);
@@ -881,10 +890,10 @@ class CponWriter {
         const keyThreshold = Array.isArray(value) ? 10 : 5;
 
         if (Array.isArray(value)) {
-            return value.length <= keyThreshold && !(value.some(x => Array.isArray(x) || x instanceof ShvMap || x instanceof IMap));
+            return value.length <= keyThreshold && !(value.some(x => Array.isArray(x) || isShvMap(x) || isIMap(x)));
         }
 
-        return Object.keys(value.value).length <= keyThreshold && !(Object.values(value.value).some(x => Array.isArray(x) || x instanceof ShvMap || x instanceof IMap));
+        return Object.keys(value).length <= keyThreshold && !(Object.values(value).some(x => Array.isArray(x) || isShvMap(x) || isIMap(x)));
     }
 
     private increaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {

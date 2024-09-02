@@ -1,7 +1,7 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack';
 import {type CponReader, CponProtocolType} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage';
-import {type RpcValue, type Null, Int, IMap, ShvMap} from './rpcvalue';
+import {type RpcValue, type Null, Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
 
@@ -115,14 +115,14 @@ class WsClient {
         this.websocket.addEventListener('open', () => {
             this.logDebug('CONNECTED');
             this.callRpcMethod(undefined, 'hello').then(() => {
-                const params = new ShvMap({
-                    login: new ShvMap({
+                const params = makeMap({
+                    login: makeMap({
                         password: this.password,
                         type: this.loginType,
                         user: this.user,
                     }),
-                    options: new ShvMap({
-                        device: this.mountPoint === 'string' ? new ShvMap({mountPoint: this.mountPoint}) : undefined,
+                    options: makeMap({
+                        device: this.mountPoint === 'string' ? makeMap({mountPoint: this.mountPoint}) : undefined,
                     }),
                 });
                 return this.callRpcMethod(undefined, 'login', params);
@@ -196,7 +196,7 @@ class WsClient {
 
         const promise = new Promise<RpcResponse>(resolve => {
             this.rpcHandlers[rq_id] = {resolve, timeout_handle: self.setTimeout(() => {
-                resolve(new MethodCallTimeout(new IMap({
+                resolve(new MethodCallTimeout(makeIMap({
                     [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
                 })));
@@ -236,7 +236,7 @@ class WsClient {
         }
         // If this path:method has not been subscribed on the broker, do it now
         if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
-            this.callRpcMethod('.broker/app', 'subscribe', new ShvMap({
+            this.callRpcMethod('.broker/app', 'subscribe', makeMap({
                 method, path,
             })).catch(() => {
                 this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
@@ -261,7 +261,7 @@ class WsClient {
         if (this.subscriptions.some(val => val.path === path && val.method === method)) {
             return;
         }
-        this.callRpcMethod('.broker/app', 'unsubscribe', new ShvMap({
+        this.callRpcMethod('.broker/app', 'unsubscribe', makeMap({
             method, path,
         })).catch(() => {
             this.logDebug(`Couldn't unsubscribe ${path}, ${method}`);
