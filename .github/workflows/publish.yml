@@ -1,0 +1,24 @@
+# vim: sw=2
+name: Publish
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Publish new version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
