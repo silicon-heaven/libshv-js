@@ -1,5 +1,5 @@
 import {utf8ToString} from './cpon';
-import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, IMap, Int, MetaMap, RpcValueWithMetaData, ShvMap, UInt, withOffset} from './rpcvalue';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
 import {UnpackContext, PackContext} from './cpcontext';
 
 enum PackingSchema {
@@ -297,19 +297,24 @@ class ChainPackReader {
     }
 
     readMetaMap() {
-        return this.implReadMap(MetaMap);
+        return this.implReadMap('metamap');
     }
 
     readMap() {
-        return this.implReadMap(ShvMap);
+        return this.implReadMap('map');
     }
 
     readIMap() {
-        return this.implReadMap(IMap);
+        return this.implReadMap('imap');
     }
 
-    private implReadMap<MapType extends MetaMap | ShvMap | IMap>(MapTypeCtor: new () => MapType) {
-        const map = new MapTypeCtor();
+    private implReadMap(map_type: 'map'): ShvMap;
+    private implReadMap(map_type: 'imap'): IMap;
+    private implReadMap(map_type: 'metamap'): MetaMap;
+    private implReadMap(map_type: 'map' | 'imap' | 'metamap') {
+        const map: ShvMap | IMap | MetaMap = {
+            [shvMapType]: map_type,
+        };
         while (true) {
             const b = this.ctx.peekByte();
             if (b as PackingSchema === PackingSchema.Term) {
@@ -318,14 +323,14 @@ class ChainPackReader {
             }
             const key = this.read();
             const val = this.read();
-            if (map instanceof MetaMap && typeof key === 'string') {
-                map.value[key] = val;
-            } else if (map instanceof MetaMap && key instanceof Int) {
-                map.value[Number(key)] = val;
-            } else if (map instanceof ShvMap && typeof key === 'string') {
-                map.value[key] = val;
-            } else if (map instanceof IMap && key instanceof Int) {
-                map.value[Number(key)] = val;
+            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'metamap' && key instanceof Int) {
+                map[Number(key)] = val;
+            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'imap' && key instanceof Int) {
+                map[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
             }
@@ -371,14 +376,20 @@ class ChainPackWriter {
             case Array.isArray(rpc_val):
                 this.writeList(rpc_val);
                 break;
-            case rpc_val instanceof IMap:
-                this.writeIMap(rpc_val);
-                break;
-            case rpc_val instanceof ShvMap:
-                this.writeMap(rpc_val);
-                break;
             case rpc_val instanceof Date:
                 this.writeDateTime(rpc_val);
+                break;
+            case rpc_val instanceof Double:
+                throw new Error('writing doubles not implemented');
+            case typeof rpc_val === 'object':
+                switch (rpc_val[shvMapType]) {
+                    case 'imap':
+                        this.writeIMap(rpc_val);
+                        break;
+                    case 'map':
+                        this.writeMap(rpc_val);
+                        break;
+                }
                 break;
             default:
                 console.log('Can\'t serialize', rpc_val);
@@ -545,19 +556,19 @@ class ChainPackWriter {
     }
 
     writeMapContent(map: MetaMap | ShvMap | IMap) {
-        for (const [key, value] of Object.entries(map.value)) {
+        for (const [key, value] of Object.entries(map)) {
             if (value === undefined) {
                 continue;
             }
 
-            if (map instanceof IMap) {
+            if (map[shvMapType] === 'imap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
                 this.writeInt(new Int(int_key));
-            } else if (map instanceof MetaMap) {
+            } else if (map[shvMapType] === 'metamap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
                     this.writeJSString(key.toString());

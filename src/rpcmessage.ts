@@ -1,4 +1,4 @@
-import {IMap, Int, MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
+import {type IMap, Int, isIMap, makeIMap, makeMetaMap, type MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
 import {toCpon} from './cpon';
 import {toChainPack} from './chainpack';
 
@@ -30,19 +30,19 @@ enum ErrorCode {
     NotImplemented = 12,
 }
 
-type ErrorMap = IMap<{
+export type ErrorMap = {
     [ERROR_CODE]: Int<ErrorCode>;
     [ERROR_MESSAGE]?: string;
     [ERROR_DATA]?: RpcValue;
-}>;
+};
 
 class RpcError extends Error {
     constructor(private readonly err_info: ErrorMap) {
-        super(err_info.value[ERROR_MESSAGE]);
+        super(err_info[ERROR_MESSAGE] ?? 'Unknown RpcError');
     }
 
     data() {
-        return this.err_info.value[ERROR_DATA];
+        return this.err_info[ERROR_DATA];
     }
 }
 
@@ -66,12 +66,12 @@ class RpcMessage {
     meta: MetaMap;
     constructor(rpc_val?: RpcValue) {
         if (rpc_val === undefined) {
-            this.value = new IMap();
-            this.meta = new MetaMap();
+            this.value = makeIMap({});
+            this.meta = makeMetaMap({});
             return;
         }
 
-        if (!(rpc_val instanceof RpcValueWithMetaData && rpc_val.value instanceof IMap)) {
+        if (!(rpc_val instanceof RpcValueWithMetaData && isIMap(rpc_val.value))) {
             throw new TypeError(`RpcMessage initialized with a non-IMap: ${toCpon(rpc_val)}`);
         }
 
@@ -96,58 +96,60 @@ class RpcMessage {
     }
 
     requestId(): Int | undefined {
-        return (this.meta.value[TagRequestId] as Int);
+        return (this.meta[TagRequestId] as Int);
     }
 
     setRequestId(id: number | Int) {
-        this.meta.value[TagRequestId] = new Int(id);
+        this.meta[TagRequestId] = new Int(id);
     }
 
     callerIds(): RpcValue[] | undefined {
-        return this.meta.value[TagCallerIds] as RpcValue[];
+        return this.meta[TagCallerIds] as RpcValue[];
     }
 
     setCallerIds(ids: RpcValue[]) {
-        this.meta.value[TagCallerIds] = ids;
+        this.meta[TagCallerIds] = ids;
     }
 
     shvPath(): string | undefined {
-        return (this.meta.value[TagShvPath] as string);
+        return (this.meta[TagShvPath] as string);
     }
 
     setShvPath(val: string) {
-        this.meta.value[TagShvPath] = val;
+        this.meta[TagShvPath] = val;
     }
 
     method(): string | undefined {
-        return (this.meta.value[TagMethod] as string);
+        return (this.meta[TagMethod] as string);
     }
 
     setMethod(val: string) {
-        this.meta.value[TagMethod] = val;
+        this.meta[TagMethod] = val;
     }
 
     params() {
-        return this.value.value[KeyParams];
+        return this.value[KeyParams];
     }
 
     setParams(params: RpcValue) {
-        this.value.value[KeyParams] = params;
+        this.value[KeyParams] = params;
     }
 
     resultOrError() {
-        if (this.value.value[KeyError] !== undefined) {
-            if (!(this.value.value[KeyError] instanceof IMap)) {
+        if (Object.hasOwn(this.value, KeyError)) {
+            if (!isIMap(this.value[KeyError])) {
                 return new ProtocolError('Response had an error, but this error was not a map');
             }
 
-            const error_map = this.value.value[KeyError];
-            if (error_map.value[ERROR_CODE] === undefined) {
+            const error_map = this.value[KeyError];
+            if (!(error_map[ERROR_CODE] instanceof Int)) {
                 return new ProtocolError('Response had an error, but this error did not contain at least an error code');
             }
 
+            const code = error_map[ERROR_CODE];
+
             const ErrorType = (() => {
-                switch ((this.value.value[KeyError] as ErrorMap).value[ERROR_CODE].value) {
+                switch (code.value) {
                     case ErrorCode.InvalidRequest: return InvalidRequest;
                     case ErrorCode.MethodNotFound: return MethodNotFound;
                     case ErrorCode.InvalidParams: return InvalidParams;
@@ -160,25 +162,26 @@ class RpcMessage {
                     case ErrorCode.LoginRequired: return LoginRequired;
                     case ErrorCode.UserIDRequired: return UserIDRequired;
                     case ErrorCode.NotImplemented: return NotImplemented;
+                    default: return Unknown;
                 }
             })();
 
-            return new ErrorType(this.value.value[KeyError] as ErrorMap);
+            return new ErrorType(this.value[KeyError] as unknown as ErrorMap);
         }
 
-        if (Object.hasOwn(this.value.value, KeyResult)) {
-            return this.value.value[KeyResult];
+        if (Object.hasOwn(this.value, KeyResult)) {
+            return this.value[KeyResult];
         }
 
         return new ProtocolError('Response included neither result nor error');
     }
 
     setResult(result: RpcValue) {
-        this.value.value[KeyResult] = result;
+        this.value[KeyResult] = result;
     }
 
     setError(error: string) {
-        this.value.value[KeyError] = error;
+        this.value[KeyError] = error;
     }
 
     toCpon() {
