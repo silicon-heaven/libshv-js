@@ -73,13 +73,13 @@ export type List = RpcValue[];
 
 const shvMapType = Symbol('shvMapType');
 
-type IMap<T extends Record<number, RpcValue> = Record<number, any>> = {
+type IMap<T extends object = Record<number, any>> = {
     [Key in keyof T]: T[Key];
 } & {
     [shvMapType]: 'imap';
 };
 
-type ShvMap<T extends Record<string, RpcValue> = Record<string, any>> = {
+type ShvMap<T extends object = Record<string, any>> = {
     [Key in keyof T]: T[Key];
 } & {
     [shvMapType]: 'map';
@@ -99,7 +99,7 @@ export type RpcValueType =
     ShvMap |
     IMap;
 
-type MetaMap<T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>> = {
+type MetaMap<T extends object = Record<string | number, RpcValue>> = {
     [Key in keyof T]: T[Key];
 } & {
     [shvMapType]: 'metamap';
@@ -109,17 +109,17 @@ const isShvMap = (x: RpcValue): x is ShvMap => typeof x === 'object' && (x as Sh
 
 const isIMap = (x: RpcValue): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
 
-const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>>(x: T = {} as T): MetaMap<T> => ({
+const makeMetaMap = <T extends object = Record<string | number, RpcValue>>(x: T = {} as T): MetaMap<T> => ({
     ...x,
     [shvMapType]: 'metamap',
 });
 
-const makeIMap = <T extends Record<number, RpcValue> = Record<number, RpcValue>>(x: T = {} as T): IMap<T> => ({
+const makeIMap = <T extends object = Record<number, RpcValue>>(x: T = {} as T): IMap<T> => ({
     ...x,
     [shvMapType]: 'imap',
 });
 
-const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>>(x: T = {} as T): ShvMap<T> => ({
+const makeMap = <T extends object = Record<string, RpcValue>>(x: T = {} as T): ShvMap<T> => ({
     ...x,
     [shvMapType]: 'map',
 });
