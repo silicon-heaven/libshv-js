@@ -109,17 +109,17 @@ const isShvMap = (x: RpcValue): x is ShvMap => typeof x === 'object' && (x as Sh
 
 const isIMap = (x: RpcValue): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
 
-const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>>(x: T = {} as T): MetaMap<T> => ({
+const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): MetaMap<U> => ({
     ...x,
     [shvMapType]: 'metamap',
 });
 
-const makeIMap = <T extends Record<number, RpcValue> = Record<number, RpcValue>>(x: T = {} as T): IMap<T> => ({
+const makeIMap = <T extends Record<number, RpcValue> = Record<number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): IMap<U> => ({
     ...x,
     [shvMapType]: 'imap',
 });
 
-const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>>(x: T = {} as T): ShvMap<T> => ({
+const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>, U extends Record<string, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): ShvMap<U> => ({
     ...x,
     [shvMapType]: 'map',
 });
