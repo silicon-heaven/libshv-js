@@ -6,6 +6,7 @@ class Int<T = number> {
             this.value = u.value;
             return;
         }
+
         if (!Number.isInteger(u)) {
             throw new TypeError('Value for Int must a positive integral number');
         }
@@ -18,10 +19,15 @@ class Int<T = number> {
     }
 }
 
-class UInt {
-    readonly value: number;
+class UInt<T extends number = number> {
+    readonly value: T;
 
-    constructor(u: number) {
+    constructor(u: T | UInt<T>) {
+        if (u instanceof UInt) {
+            this.value = u.value;
+            return;
+        }
+
         if (u < 0 || !Number.isInteger(u)) {
             throw new Error(`Invalid value '${u}' for UInt must a positive integral number`);
         }
