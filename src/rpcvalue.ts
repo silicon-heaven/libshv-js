@@ -1,24 +1,3 @@
-class Int<T = number> {
-    readonly value: T;
-
-    constructor(u: T | Int<T>) {
-        if (u instanceof Int) {
-            this.value = u.value;
-            return;
-        }
-
-        if (!Number.isInteger(u)) {
-            throw new TypeError('Value for Int must a positive integral number');
-        }
-
-        this.value = u;
-    }
-
-    [Symbol.toPrimitive](_hint: string) {
-        return this.value;
-    }
-}
-
 class UInt<T extends number = number> {
     readonly value: T;
 
@@ -91,6 +70,8 @@ type ShvMap<T extends Record<string, RpcValue> = Record<string, any>> = {
     [shvMapType]: 'map';
 };
 
+export type Int = number;
+
 export type RpcValueType =
     Null |
     Bool |
@@ -136,4 +117,4 @@ class RpcValueWithMetaData {
 
 export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-export {shvMapType, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isShvMap};
+export {shvMapType, Decimal, Double, type IMap, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isShvMap};

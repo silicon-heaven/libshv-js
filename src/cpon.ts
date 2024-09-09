@@ -1,4 +1,4 @@
-import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
+import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
 const hexify = (byte: number) => {
@@ -475,7 +475,7 @@ class CponReader {
         if (neg) {
             val = -val;
         }
-        return new Int(val);
+        return val;
     }
 
     readNumber() {
@@ -547,7 +547,7 @@ class CponReader {
         if (is_uint) {
             return new UInt(mantisa);
         }
-        return new Int(is_neg ? -mantisa : mantisa);
+        return is_neg ? -mantisa : mantisa;
     }
 
     private implReadMap(map_type: 'map', terminator: number): ShvMap;
@@ -575,11 +575,11 @@ class CponReader {
 
             if (map[shvMapType] === 'metamap' && typeof key === 'string') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || key instanceof Int)) {
+            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || typeof key === 'number')) {
                 map[Number(key)] = val;
             } else if (map[shvMapType] === 'map' && typeof key === 'string') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || key instanceof Int)) {
+            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || typeof key === 'number')) {
                 map[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
@@ -618,7 +618,7 @@ class CponWriter {
             case rpc_val instanceof UInt:
                 this.writeUInt(rpc_val);
                 break;
-            case rpc_val instanceof Int:
+            case typeof rpc_val === 'number':
                 this.writeInt(rpc_val);
                 break;
             case rpc_val instanceof Double:
@@ -786,7 +786,7 @@ class CponWriter {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
-                this.writeInt(new Int(int_key));
+                this.writeInt(int_key);
             } else if (map[shvMapType] === 'metamap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
@@ -794,7 +794,7 @@ class CponWriter {
                     this.ctx.writeStringUtf8(key.toString());
                     this.ctx.putByte('"'.codePointAt(0)!);
                 } else {
-                    this.writeInt(new Int(int_key));
+                    this.writeInt(int_key);
                 }
             } else {
                 this.writeJSString(key.toString());
