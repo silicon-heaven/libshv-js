@@ -1,7 +1,7 @@
 import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack';
 import {type CponReader, CponProtocolType} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage';
-import {type RpcValue, type Null, Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
+import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
 
@@ -63,7 +63,7 @@ export const DIR_SIGNALS = 6;
 export const DIR_EXTRA = 63;
 type DirResult = Array<IMap<{
     [DIR_NAME]: string;
-    [DIR_FLAGS]: Int<DirFlags>;
+    [DIR_FLAGS]: DirFlags;
     [DIR_PARAM]: string | Null;
     [DIR_RESULT]: string | Null;
     [DIR_ACCESS]: Int;
@@ -197,7 +197,7 @@ class WsClient {
         const promise = new Promise<RpcResponse>(resolve => {
             this.rpcHandlers[rq_id] = {resolve, timeout_handle: self.setTimeout(() => {
                 resolve(new MethodCallTimeout(makeIMap({
-                    [ERROR_CODE]: new Int(ErrorCode.MethodCallTimeout),
+                    [ERROR_CODE]: ErrorCode.MethodCallTimeout,
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
                 })));
             }, this.timeout)};

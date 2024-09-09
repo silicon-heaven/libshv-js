@@ -1,5 +1,5 @@
 import {utf8ToString} from './cpon';
-import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
 import {UnpackContext, PackContext} from './cpcontext';
 
 enum PackingSchema {
@@ -106,7 +106,7 @@ class ChainPackReader {
 
         if (codePointAt < PackingSchema.Null) {
             if (codePointAt >= PackingSchema.IntThreshold) {
-                return impl_return(new Int(codePointAt - 64));
+                return impl_return(codePointAt - 64);
             }
             return impl_return(new UInt(codePointAt));
         }
@@ -121,7 +121,7 @@ class ChainPackReader {
                 return impl_return(false);
             }
             case PackingSchema.Int: {
-                return impl_return(new Int(this.readIntData()));
+                return impl_return(this.readIntData());
             }
             case PackingSchema.UInt: {
                 return impl_return(new UInt(this.readUIntData()));
@@ -325,11 +325,11 @@ class ChainPackReader {
             const val = this.read();
             if (map[shvMapType] === 'metamap' && typeof key === 'string') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && key instanceof Int) {
+            } else if (map[shvMapType] === 'metamap' && typeof key === 'number') {
                 map[Number(key)] = val;
             } else if (map[shvMapType] === 'map' && typeof key === 'string') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'imap' && key instanceof Int) {
+            } else if (map[shvMapType] === 'imap' && typeof key === 'number') {
                 map[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
@@ -367,7 +367,7 @@ class ChainPackWriter {
             case rpc_val instanceof UInt:
                 this.writeUInt(rpc_val);
                 break;
-            case rpc_val instanceof Int:
+            case typeof rpc_val === 'number':
                 this.writeInt(rpc_val);
                 break;
             case rpc_val instanceof Decimal:
@@ -567,13 +567,13 @@ class ChainPackWriter {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
-                this.writeInt(new Int(int_key));
+                this.writeInt(int_key);
             } else if (map[shvMapType] === 'metamap') {
                 const int_key = Number(key);
                 if (Number.isNaN(int_key)) {
                     this.writeJSString(key.toString());
                 } else {
-                    this.writeInt(new Int(int_key));
+                    this.writeInt(int_key);
                 }
             } else {
                 this.writeJSString(key.toString());

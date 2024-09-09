@@ -1,4 +1,4 @@
-import {type IMap, Int, isIMap, makeIMap, makeMetaMap, type MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
+import {type IMap, type Int, isIMap, makeIMap, makeMetaMap, type MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
 import {toCpon} from './cpon';
 import {toChainPack} from './chainpack';
 
@@ -31,7 +31,7 @@ enum ErrorCode {
 }
 
 export type ErrorMap = {
-    [ERROR_CODE]: Int<ErrorCode>;
+    [ERROR_CODE]: ErrorCode;
     [ERROR_MESSAGE]?: string;
     [ERROR_DATA]?: RpcValue;
 };
@@ -99,8 +99,8 @@ class RpcMessage {
         return (this.meta[TagRequestId] as Int);
     }
 
-    setRequestId(id: number | Int) {
-        this.meta[TagRequestId] = new Int(id);
+    setRequestId(id: number) {
+        this.meta[TagRequestId] = id;
     }
 
     callerIds(): RpcValue[] | undefined {
@@ -142,7 +142,7 @@ class RpcMessage {
             }
 
             const error_map = this.value[KeyError];
-            if (!(error_map[ERROR_CODE] instanceof Int)) {
+            if (!(typeof error_map[ERROR_CODE] !== 'number')) {
                 return new ProtocolError('Response had an error, but this error did not contain at least an error code');
             }
 
