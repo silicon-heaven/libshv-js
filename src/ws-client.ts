@@ -41,6 +41,7 @@ type WsClientOptions = {
     timeout?: number;
     wsUri: string;
     onConnected: () => void;
+    onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
     onRequest: (rpc_msg: RpcMessage) => void;
 };
@@ -87,6 +88,7 @@ class WsClient {
     password: WsClientOptions['password'];
     loginType: WsClientOptions['loginType'];
     onConnected: WsClientOptions['onConnected'];
+    onConnectionFailure: WsClientOptions['onConnectionFailure'];
     onDisconnected: WsClientOptions['onDisconnected'];
     onRequest: WsClientOptions['onRequest'];
     timeout: WsClientOptions['timeout'];
@@ -107,6 +109,7 @@ class WsClient {
         this.websocket.binaryType = 'arraybuffer';
 
         this.onConnected = options.onConnected ?? (() => {/* nothing */});
+        this.onConnectionFailure = options.onConnectionFailure ?? (() => {/* nothing */});
         this.onDisconnected = options.onDisconnected ?? (() => {/* nothing */});
         this.onRequest = options.onRequest ?? (() => {/* nothing */});
 
@@ -114,7 +117,15 @@ class WsClient {
 
         this.websocket.addEventListener('open', () => {
             this.logDebug('CONNECTED');
-            this.callRpcMethod(undefined, 'hello').then(() => {
+            const handleConnectionError = (error: Error) => {
+                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
+                this.onConnectionFailure(error);
+            };
+            this.callRpcMethod(undefined, 'hello').then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
                 const params = makeMap({
                     login: makeMap({
                         password: this.password,
@@ -126,7 +137,11 @@ class WsClient {
                     }),
                 });
                 return this.callRpcMethod(undefined, 'login', params);
-            }).then(() => {
+            }).then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
                 this.logDebug('SUCCESS: connected to shv broker');
                 this.onConnected();
             }).catch(() => {
