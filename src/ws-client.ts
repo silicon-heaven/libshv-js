@@ -178,6 +178,7 @@ class WsClient {
         });
     }
 
+    callRpcMethod(shv_path: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<RpcResponse<string>>;
     callRpcMethod(shv_path: string | undefined, method: 'dir', params?: RpcValue): Promise<RpcResponse<DirResult>>;
     callRpcMethod(shv_path: string | undefined, method: 'ls', params?: RpcValue): Promise<RpcResponse<LsResult>>;
     callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<RpcResponse>;
@@ -266,6 +267,10 @@ class WsClient {
         })).catch(() => {
             this.logDebug(`Couldn't unsubscribe ${path}, ${method}`);
         });
+    }
+
+    accessGrantForMethodCall(path: string, method: string) {
+        return this.callRpcMethod('.broker/currentClient', 'accessGrantForMethodCall', [path, method]);
     }
 
     close() {
