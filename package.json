@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "3.3.4",
+  "version": "3.3.5",
   "description": "Typescript implementation of libshv",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/silicon-heaven/libshv-js",
   "exports": {
+    "./access.ts": "./src/access.ts",
     "./chainpack.ts": "./src/chainpack.ts",
     "./cpcontext.ts": "./src/cpcontext.ts",
     "./cpon.ts": "./src/cpon.ts",
