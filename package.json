@@ -17,7 +17,6 @@
   },
   "homepage": "https://github.com/silicon-heaven/libshv-js",
   "exports": {
-    "./bint.ts": "./src/bint.ts",
     "./chainpack.ts": "./src/chainpack.ts",
     "./cpcontext.ts": "./src/cpcontext.ts",
     "./cpon.ts": "./src/cpon.ts",
