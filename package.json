@@ -4,7 +4,7 @@
   "description": "Typescript implementation of libshv",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "xo --reporter unix src/* --extension=vue",
+    "lint": "xo --reporter unix test.ts src/* --extension=vue",
     "fix": "npm run lint -- --fix"
   },
   "author": "Elektroline",
