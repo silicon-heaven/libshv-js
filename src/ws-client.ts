@@ -150,7 +150,9 @@ class WsClient {
                 }
                 this.logDebug('SUCCESS: connected to shv broker');
                 this.onConnected();
-                this.pingTimerId = window.setInterval(() => this.sendPing(), this.pingInterval);
+                this.pingTimerId = window.setInterval(() => {
+                    this.sendPing();
+                }, this.pingInterval);
             }).catch(() => {
                 this.logDebug('FAILURE: couldn\' connected to shv broker');
             });
@@ -293,11 +295,9 @@ class WsClient {
     }
 
     sendPing() {
-        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            this.callRpcMethod('.broker/app', 'ping').catch((error: unknown) => {
-                console.log('Failed to send ping:', error);
-            });
-        }
+        this.callRpcMethod('.broker/app', 'ping').catch((error: unknown) => {
+            console.log('Failed to send ping:', error);
+        });
     }
 
     accessGrantForMethodCall(path: string, method: string) {
