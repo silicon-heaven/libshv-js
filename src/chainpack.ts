@@ -61,14 +61,11 @@ const uint8ArrayBoBigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
 const numberToUint8Array = (num: bigint) => {
     let bytes = new Uint8Array(8);
     let len = 0;
-    while (true) {
+    do {
         const res = divInt(num, 256n);
         num = res[0];
         bytes[len++] = Number(res[1]);
-        if (num === 0n) {
-            break;
-        }
-    }
+    } while(num !== 0n);
 
     bytes = bytes.subarray(0, len);
     bytes.reverse();
