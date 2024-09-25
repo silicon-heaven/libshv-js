@@ -132,7 +132,7 @@ class RpcMessage {
     }
 
     params() {
-        return this.value[RpcMessageKey.Params];
+        return this.value[RpcMessageKey.Params] as RpcValue;
     }
 
     setParams(params: RpcValue) {
@@ -152,7 +152,7 @@ class RpcMessage {
 
             const code = errorMap[ERROR_CODE] as unknown;
 
-            const errorTypeCtor = (() => {
+            const ErrorTypeCtor = (() => {
                 switch (code) {
                     case ErrorCode.InvalidRequest: return InvalidRequest;
                     case ErrorCode.MethodNotFound: return MethodNotFound;
@@ -170,11 +170,11 @@ class RpcMessage {
                 }
             })();
 
-            return new errorTypeCtor(this.value[RpcMessageKey.Error] as unknown as ErrorMap);
+            return new ErrorTypeCtor(this.value[RpcMessageKey.Error] as IMap<ErrorMap>);
         }
 
         if (Object.hasOwn(this.value, RpcMessageKey.Result)) {
-            return this.value[RpcMessageKey.Result];
+            return this.value[RpcMessageKey.Result] as RpcValue;
         }
 
         return new ProtocolError('Response included neither result nor error');

@@ -169,7 +169,7 @@ class WsClient {
             window.clearInterval(this.pingTimerId);
         });
 
-        this.websocket.addEventListener('message', evt => {
+        this.websocket.addEventListener('message', (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
             const rpcMsg = new RpcMessage(rpcVal);
             this.logDebug(`message received: ${rpcMsg.toCpon()}`);

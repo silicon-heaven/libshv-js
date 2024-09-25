@@ -15,7 +15,7 @@
                 "format": ["PascalCase"],
                 "selector": "variable",
                 "modifiers": ["const"],
-                "filter": "Validation$|Zod$"
+                "filter": "Ctor$|Validation$|Zod$"
             }
         ],
         "@typescript-eslint/prefer-promise-reject-errors": "off",
