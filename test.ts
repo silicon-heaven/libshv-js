@@ -7,6 +7,7 @@ const checkEq = (e1: string | number, e2: string | number) => {
         throw new Error(`test check error: ${e1} === ${e2}`);
     }
 };
+
 for (const lst of [
     [((2 ** 31) - 1) + 'u', null],
     [((2 ** 32) - 1) + 'u', null], // too big for JS bitwise operations
@@ -78,6 +79,7 @@ for (const lst of [
     const cpn2 = toCpon(rv2);
     checkEq(cpn1, cpn2);
 }
+
 // same points in time
 const v1 = fromCpon('d"2017-05-03T18:30:00Z"') as DateTime;
 const v2 = fromCpon('d"2017-05-03T22:30:00+04"') as DateTime;
