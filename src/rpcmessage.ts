@@ -2,14 +2,18 @@ import {type IMap, type Int, isIMap, makeIMap, makeMetaMap, type MetaMap, type R
 import {toCpon} from './cpon';
 import {toChainPack} from './chainpack';
 
-const TagRequestId = 8;
-const TagShvPath = 9;
-const TagMethod = 10;
-const TagCallerIds = 11;
+enum RpcMessageTag {
+    RequestId = 8,
+    ShvPath = 9,
+    Method = 10,
+    CallerIds = 11,
+}
 
-const KeyParams = 1;
-const KeyResult = 2;
-const KeyError = 3;
+enum RpcMessageKey {
+    Params = 1,
+    Result = 2,
+    Error = 3,
+}
 
 export const ERROR_CODE = 1;
 export const ERROR_MESSAGE = 2;
@@ -96,52 +100,52 @@ class RpcMessage {
     }
 
     requestId(): Int | undefined {
-        return (this.meta[TagRequestId] as Int);
+        return (this.meta[RpcMessageTag.RequestId] as Int);
     }
 
     setRequestId(id: number) {
-        this.meta[TagRequestId] = id;
+        this.meta[RpcMessageTag.RequestId] = id;
     }
 
     callerIds(): RpcValue[] | undefined {
-        return this.meta[TagCallerIds] as RpcValue[];
+        return this.meta[RpcMessageTag.CallerIds] as RpcValue[];
     }
 
     setCallerIds(ids: RpcValue[]) {
-        this.meta[TagCallerIds] = ids;
+        this.meta[RpcMessageTag.CallerIds] = ids;
     }
 
     shvPath(): string | undefined {
-        return (this.meta[TagShvPath] as string);
+        return (this.meta[RpcMessageTag.ShvPath] as string);
     }
 
     setShvPath(val: string) {
-        this.meta[TagShvPath] = val;
+        this.meta[RpcMessageTag.ShvPath] = val;
     }
 
     method(): string | undefined {
-        return (this.meta[TagMethod] as string);
+        return (this.meta[RpcMessageTag.Method] as string);
     }
 
     setMethod(val: string) {
-        this.meta[TagMethod] = val;
+        this.meta[RpcMessageTag.Method] = val;
     }
 
     params() {
-        return this.value[KeyParams];
+        return this.value[RpcMessageKey.Params];
     }
 
     setParams(params: RpcValue) {
-        this.value[KeyParams] = params;
+        this.value[RpcMessageKey.Params] = params;
     }
 
     resultOrError() {
-        if (Object.hasOwn(this.value, KeyError)) {
-            if (!isIMap(this.value[KeyError])) {
+        if (Object.hasOwn(this.value, RpcMessageKey.Error)) {
+            if (!isIMap(this.value[RpcMessageKey.Error])) {
                 return new ProtocolError('Response had an error, but this error was not a map');
             }
 
-            const errorMap = this.value[KeyError];
+            const errorMap = this.value[RpcMessageKey.Error];
             if (typeof errorMap[ERROR_CODE] !== 'number') {
                 return new ProtocolError('Response had an error, but this error did not contain at least an error code');
             }
@@ -166,22 +170,22 @@ class RpcMessage {
                 }
             })();
 
-            return new errorTypeCtor(this.value[KeyError] as unknown as ErrorMap);
+            return new errorTypeCtor(this.value[RpcMessageKey.Error] as unknown as ErrorMap);
         }
 
-        if (Object.hasOwn(this.value, KeyResult)) {
-            return this.value[KeyResult];
+        if (Object.hasOwn(this.value, RpcMessageKey.Result)) {
+            return this.value[RpcMessageKey.Result];
         }
 
         return new ProtocolError('Response included neither result nor error');
     }
 
     setResult(result: RpcValue) {
-        this.value[KeyResult] = result;
+        this.value[RpcMessageKey.Result] = result;
     }
 
     setError(error: string) {
-        this.value[KeyError] = error;
+        this.value[RpcMessageKey.Error] = error;
     }
 
     toCpon() {
