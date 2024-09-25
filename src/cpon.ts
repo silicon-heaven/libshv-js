@@ -160,6 +160,8 @@ class CponReader {
         const LF = '\n'.codePointAt(0)!;
         const KEY_DELIM = ':'.codePointAt(0)!;
         const FIELD_DELIM = ','.codePointAt(0)!;
+        /* eslint-disable max-depth */
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.peekByte();
             if (b < 1) {
@@ -173,6 +175,7 @@ class CponReader {
                         b = this.ctx.getByte();
                         if (b === STAR) {
                             // multiline_comment_entered;
+                            // eslint-disable-next-line no-constant-condition
                             while (true) {
                                 b = this.ctx.getByte();
                                 if (b === STAR) {
@@ -184,6 +187,7 @@ class CponReader {
                             }
                         } else if (b === SLASH) {
                             // to end of line comment entered;
+                            // eslint-disable-next-line no-constant-condition
                             while (true) {
                                 b = this.ctx.getByte();
                                 if (b === LF) {
@@ -214,6 +218,7 @@ class CponReader {
                 this.ctx.getByte();
             }
         }
+        /* eslint-enable max-depth */
     }
 
     readDateTime() {
@@ -316,6 +321,7 @@ class CponReader {
     readCString() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.getByte();
             if (b === '\\'.codePointAt(0)) {
@@ -363,6 +369,7 @@ class CponReader {
     readBlobEsc() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.getByte();
             if (b === '\\'.codePointAt(0)) {
@@ -405,6 +412,7 @@ class CponReader {
     readBlobHex() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.getByte();
             if (b === '"'.codePointAt(0)) {
@@ -422,6 +430,7 @@ class CponReader {
     readList() {
         const lst = [];
         this.ctx.getByte(); // eat '['
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             this.skipWhitespace();
             const b = this.ctx.peekByte();
@@ -533,6 +542,7 @@ class CponReader {
         mantisa = Number(this.readInt());
         b = this.ctx.peekByte();
         (() => {
+            // eslint-disable-next-line no-constant-condition
             while (true) {
                 switch (b) {
                     case 'u'.codePointAt(0): {
@@ -601,6 +611,7 @@ class CponReader {
             [shvMapType]: map_type,
         };
         this.ctx.getByte(); // eat start
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             this.skipWhitespace();
             const b = this.ctx.peekByte();

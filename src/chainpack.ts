@@ -65,7 +65,7 @@ const numberToUint8Array = (num: bigint) => {
         const res = divInt(num, 256n);
         num = res[0];
         bytes[len++] = Number(res[1]);
-    } while(num !== 0n);
+    } while (num !== 0n);
 
     bytes = bytes.subarray(0, len);
     bytes.reverse();
@@ -89,6 +89,7 @@ class ChainPackReader {
         this.ctx = data instanceof UnpackContext ? data : new UnpackContext(data);
     }
 
+    /* eslint-disable complexity */
     read(): RpcValue {
         let meta: MetaMap | undefined;
         let codePointAt = this.ctx.getByte() as PackingSchema;
@@ -215,6 +216,7 @@ class ChainPackReader {
             case PackingSchema.CString: {
                 // variation of CponReader.readCString()
                 const pctx = new PackContext();
+                // eslint-disable-next-line no-constant-condition
                 while (true) {
                     let b = this.ctx.getByte();
                     if (b === '\\'.codePointAt(0)) {
@@ -245,6 +247,7 @@ class ChainPackReader {
                 throw new TypeError('ChainPack - Invalid type info: ' + codePointAt);
         }
     }
+    /* eslint-enable complexity */
 
     readUIntDataHelper(type: 'Int' | 'UInt') {
         let num = 0;
@@ -314,6 +317,7 @@ class ChainPackReader {
 
     readList() {
         const lst = [];
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.peekByte();
             if (b as PackingSchema === PackingSchema.Term) {
@@ -346,6 +350,7 @@ class ChainPackReader {
         const map: ShvMap | IMap | MetaMap = {
             [shvMapType]: map_type,
         };
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.peekByte();
             if (b as PackingSchema === PackingSchema.Term) {
