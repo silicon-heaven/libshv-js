@@ -1,5 +1,5 @@
-import {ChainPackReader, ChainpackProtocolType, ChainPackWriter} from './chainpack';
-import {type CponReader, CponProtocolType} from './cpon';
+import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter} from './chainpack';
+import {type CponReader, CPON_PROTOCOL_TYPE} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
 
@@ -11,9 +11,9 @@ const dataToRpcValue = (buff: ArrayBuffer) => {
     rd.readUIntData();
     const proto = rd.ctx.getByte();
     switch (proto) {
-        case ChainpackProtocolType:
+        case CHAINPACK_PROTOCOL_TYPE:
             break;
-        case CponProtocolType:
+        case CPON_PROTOCOL_TYPE:
             throw new Error('CPON protocol type is not supported anymore');
         default:
             throw new Error(`Unsupported protocol type ${proto}`);
@@ -251,7 +251,7 @@ class WsClient {
                 dgram[ix++] = wr.ctx.data[i];
             }
 
-            dgram[ix++] = ChainpackProtocolType;
+            dgram[ix++] = CHAINPACK_PROTOCOL_TYPE;
 
             for (const msgDatum of msgData) {
                 dgram[ix++] = msgDatum;

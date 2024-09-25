@@ -997,6 +997,6 @@ const fromCpon = (str: string | Uint8Array) => {
     return rd.read();
 };
 
-const CponProtocolType = 2;
+const CPON_PROTOCOL_TYPE = 2;
 
-export {utf8ToString, CponWriter, CponReader, CponProtocolType, toCpon, fromCpon};
+export {utf8ToString, CponWriter, CponReader, CPON_PROTOCOL_TYPE, toCpon, fromCpon};
