@@ -30,7 +30,6 @@
         "default-case": "off",
         "import/extensions": "off",
         "import/no-unassigned-import": "off",
-        "no-unused-vars": "off",
         "no-warning-comments": "off",
         "prefer-promise-reject-errors": "off",
         "unicorn/explicit-length-check": "off",
