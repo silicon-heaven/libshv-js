@@ -100,7 +100,7 @@ class ChainPackReader {
         }
 
         const implReturn = (x: RpcValueType) => {
-            const ret = meta !== undefined ? new RpcValueWithMetaData(x, meta) : x;
+            const ret = meta !== undefined ? new RpcValueWithMetaData(meta, x) : x;
             return ret;
         };
 

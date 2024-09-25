@@ -1,7 +1,7 @@
-import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter} from './chainpack';
-import {type CponReader, CPON_PROTOCOL_TYPE} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessage, type RpcResponse, MethodCallTimeout} from './rpcmessage';
-import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
+import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
+import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT} from './rpcmessage';
+import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
@@ -25,7 +25,9 @@ const dataToRpcValue = (buff: ArrayBuffer) => {
 
 type SubscriptionCallback = (path: string, method: string, param?: RpcValue) => void;
 
-type RpcResponseResolver = (rpc_msg: RpcResponse) => void;
+type ResultOrError<T = RpcValue> = T | Error;
+
+type RpcResponseResolver = (rpc_msg: ResultOrError) => void;
 
 type Subscription = {
     subscriber: string;
@@ -46,7 +48,7 @@ type WsClientOptions = {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (rpc_msg: RpcMessage) => void;
+    onRequest: (rpc_msg: RpcRequest) => void;
 };
 
 type LsResult = string[];
@@ -74,6 +76,31 @@ type DirResult = Array<IMap<{
     [DIR_SIGNALS]: ShvMap<Record<string, string | Null>>;
     [DIR_EXTRA]: ShvMap;
 }>>;
+
+class RpcError extends Error {
+    constructor(private readonly err_info: ErrorMap) {
+        super(err_info[ERROR_MESSAGE] ?? 'Unknown RpcError');
+    }
+
+    data() {
+        return this.err_info[ERROR_DATA];
+    }
+}
+
+class ProtocolError extends Error {}
+
+class InvalidRequest extends RpcError {}
+class MethodNotFound extends RpcError {}
+class InvalidParams extends RpcError {}
+class InternalError extends RpcError {}
+class ParseError extends RpcError {}
+class MethodCallTimeout extends RpcError {}
+class MethodCallCancelled extends RpcError {}
+class MethodCallException extends RpcError {}
+class Unknown extends RpcError {}
+class LoginRequired extends RpcError {}
+class UserIDRequired extends RpcError {}
+class NotImplemented extends RpcError {}
 
 class WsClient {
     requestId = 1;
@@ -171,30 +198,56 @@ class WsClient {
 
         this.websocket.addEventListener('message', (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
-            const rpcMsg = new RpcMessage(rpcVal);
-            this.logDebug(`message received: ${rpcMsg.toCpon()}`);
+            const rpcMsg = RpcMessageZod.parse(rpcVal);
+            this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
-            if (rpcMsg.isSignal()) {
+            if (isSignal(rpcMsg)) {
                 for (const sub of this.subscriptions) {
-                    const shvPath = rpcMsg.shvPath();
-                    const method = rpcMsg.method();
+                    const shvPath = rpcMsg.meta[RPC_MESSAGE_SHV_PATH];
+                    const method = rpcMsg.meta[RPC_MESSAGE_METHOD];
 
-                    if (shvPath?.startsWith(sub.path) && method === sub.method) {
-                        sub.callback(shvPath, method, rpcMsg.params());
+                    if (shvPath.startsWith(sub.path) && method === sub.method) {
+                        sub.callback(shvPath, method, rpcMsg.value[RPC_MESSAGE_PARAMS]);
                     }
                 }
-            } else if (rpcMsg.isRequest()) {
+            } else if (isRequest(rpcMsg)) {
                 this.onRequest(rpcMsg);
-            } else if (rpcMsg.isResponse()) {
-                const requestId = rpcMsg.requestId();
-                if (requestId === undefined) {
-                    throw new Error('got RpcResponse without requestId');
-                }
+            } else if (isResponse(rpcMsg)) {
+                const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];
 
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
                     const handler = this.rpcHandlers[Number(requestId)];
                     clearTimeout(handler.timeout_handle);
-                    handler.resolve(rpcMsg.resultOrError());
+                    handler.resolve((() => {
+                        if (RPC_MESSAGE_ERROR in rpcMsg.value) {
+                            const code = rpcMsg.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
+                            const ErrorTypeCtor = (() => {
+                                switch (code) {
+                                    case ErrorCode.InvalidRequest: return InvalidRequest;
+                                    case ErrorCode.MethodNotFound: return MethodNotFound;
+                                    case ErrorCode.InvalidParams: return InvalidParams;
+                                    case ErrorCode.InternalError: return InternalError;
+                                    case ErrorCode.ParseError: return ParseError;
+                                    case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
+                                    case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
+                                    case ErrorCode.MethodCallException: return MethodCallException;
+                                    case ErrorCode.Unknown: return Unknown;
+                                    case ErrorCode.LoginRequired: return LoginRequired;
+                                    case ErrorCode.UserIDRequired: return UserIDRequired;
+                                    case ErrorCode.NotImplemented: return NotImplemented;
+                                    default: return Unknown;
+                                }
+                            })();
+
+                            return new ErrorTypeCtor(rpcMsg.value[RPC_MESSAGE_ERROR]);
+                        }
+
+                        if (RPC_MESSAGE_RESULT in rpcMsg.value) {
+                            return rpcMsg.value[RPC_MESSAGE_RESULT];
+                        }
+
+                        return new ProtocolError('Response included neither result nor error');
+                    })());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }
@@ -207,30 +260,29 @@ class WsClient {
         });
     }
 
-    callRpcMethod(shv_path: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<RpcResponse<string>>;
-    callRpcMethod(shv_path: string | undefined, method: 'dir', params?: RpcValue): Promise<RpcResponse<DirResult>>;
-    callRpcMethod(shv_path: string | undefined, method: 'ls', params?: RpcValue): Promise<RpcResponse<LsResult>>;
-    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<RpcResponse>;
-    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue) {
-        const rq = new RpcMessage();
+    callRpcMethod(shv_path: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<ResultOrError<string>>;
+    callRpcMethod(shv_path: string | undefined, method: 'dir', params?: RpcValue): Promise<ResultOrError<DirResult>>;
+    callRpcMethod(shv_path: string | undefined, method: 'ls', params?: RpcValue): Promise<ResultOrError<LsResult>>;
+    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError>;
+    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError> {
         const rqId = this.requestId++;
-        rq.setRequestId(rqId);
-        if (shv_path !== undefined) {
-            rq.setShvPath(shv_path);
-        }
-
-        rq.setMethod(method);
-        if (params !== undefined) {
-            rq.setParams(params);
-        }
+        const rq: RpcRequest = new RpcValueWithMetaData(makeMetaMap({
+            [RPC_MESSAGE_REQUEST_ID]: rqId,
+            [RPC_MESSAGE_METHOD]: method ?? '',
+            [RPC_MESSAGE_SHV_PATH]: shv_path ?? '',
+        }), makeIMap({
+            [RPC_MESSAGE_PARAMS]: params,
+        }),
+        );
 
         this.sendRpcMessage(rq);
 
-        const promise = new Promise<RpcResponse>(resolve => {
+        const promise = new Promise<ResultOrError>(resolve => {
             this.rpcHandlers[rqId] = {resolve, timeout_handle: self.setTimeout(() => {
                 resolve(new MethodCallTimeout(makeIMap({
                     [ERROR_CODE]: ErrorCode.MethodCallTimeout,
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
+                    [ERROR_DATA]: undefined,
                 })));
             }, this.timeout)};
         });
@@ -240,8 +292,8 @@ class WsClient {
 
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            this.logDebug('sending rpc message:', rpc_msg.toCpon());
-            const msgData = new Uint8Array(rpc_msg.toChainPack());
+            this.logDebug('sending rpc message:', toCpon(rpc_msg));
+            const msgData = new Uint8Array(toChainPack(rpc_msg));
 
             const wr = new ChainPackWriter();
             wr.writeUIntData(msgData.length + 1);
