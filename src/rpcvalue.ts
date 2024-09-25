@@ -50,10 +50,11 @@ export type Blob = ArrayBuffer;
 export type ShvString = string;
 export type DateTime = Date & {utc_offset?: number};
 const withOffset = (date: Date, utc_offset?: number) => {
-    const cloned_date: DateTime = new Date(date.getTime());
-    cloned_date.utc_offset = utc_offset;
-    return cloned_date;
+    const clonedDate: DateTime = new Date(date.getTime());
+    clonedDate.utc_offset = utc_offset;
+    return clonedDate;
 };
+
 export type List = RpcValue[];
 
 const shvMapType = Symbol('shvMapType');
@@ -92,9 +93,9 @@ type MetaMap<T extends Record<string | number, RpcValue> = Record<string | numbe
     [shvMapType]: 'metamap';
 };
 
-const isShvMap = (x: RpcValue): x is ShvMap => typeof x === 'object' && (x as ShvMap)[shvMapType] === 'map';
+const isShvMap = (x: unknown): x is ShvMap => typeof x === 'object' && (x as ShvMap)[shvMapType] === 'map';
 
-const isIMap = (x: RpcValue): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
+const isIMap = (x: unknown): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
 
 const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): MetaMap<U> => ({
     ...x,

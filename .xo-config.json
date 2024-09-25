@@ -1,22 +1,27 @@
 {
     "space": 4,
     "rules": {
-        "@typescript-eslint/no-unsafe-argument": "off",
-        "@typescript-eslint/no-unsafe-assignment": "off",
-        "@typescript-eslint/no-unsafe-call": "off",
-        "@typescript-eslint/no-unsafe-return": "off",
-
-        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/naming-convention": ["error",
+            {
+                "selector": "variable",
+                "format": ["camelCase"]
+            },
+            {
+                "format": ["camelCase", "UPPER_CASE"],
+                "selector": "variable",
+                "modifiers": ["const"]
+            },
+            {
+                "format": ["PascalCase"],
+                "selector": "variable",
+                "modifiers": ["const"],
+                "filter": "Validation$|Zod$"
+            }
+        ],
         "@typescript-eslint/prefer-promise-reject-errors": "off",
         "@typescript-eslint/promise-function-async": "off",
+        "@typescript-eslint/triple-slash-reference": "off",
         "capitalized-comments": "off",
-        "max-depth": "off",
-        "@typescript-eslint/padding-line-between-statements": "off",
-        "no-constant-condition": ["error", {
-            "checkLoops": false
-        }],
-        "complexity": "off",
-        "no-bitwise": "off",
         "object-curly-newline": ["error", {
             "ImportDeclaration": "never"
         }],
@@ -24,10 +29,14 @@
         "promise-function-async": "off",
         "default-case": "off",
         "import/extensions": "off",
+        "import/no-unassigned-import": "off",
+        "no-unused-vars": "off",
+        "no-warning-comments": "off",
         "prefer-promise-reject-errors": "off",
-        "eslint-disable-next-line prefer-promise-reject-errors": "off",
         "unicorn/explicit-length-check": "off",
+        "unicorn/filename-case": "off",
         "unicorn/no-negated-condition": "off",
+        "unicorn/prefer-top-level-await": "off",
         "unicorn/switch-case-braces": "off",
         "unicorn/prevent-abbreviations": "off"
     }

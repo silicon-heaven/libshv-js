@@ -11,6 +11,7 @@ class UnpackContext {
         if (this.index >= this.data.length) {
             throw new RangeError('unexpected end of data');
         }
+
         return this.data[this.index++];
     }
 
@@ -18,6 +19,7 @@ class UnpackContext {
         if (this.index >= this.data.length) {
             return -1;
         }
+
         return this.data[this.index];
     }
 
@@ -35,10 +37,10 @@ const transfer = (source: ArrayBuffer, length: number) => {
         return source.slice(0, length);
     }
 
-    const source_view = new Uint8Array(source);
-    const dest_view = new Uint8Array(new ArrayBuffer(length));
-    dest_view.set(source_view);
-    return dest_view.buffer;
+    const sourceView = new Uint8Array(source);
+    const destView = new Uint8Array(new ArrayBuffer(length));
+    destView.set(sourceView);
+    return destView.buffer;
 };
 
 class PackContext {
@@ -52,6 +54,7 @@ class PackContext {
             const buffer = transfer(this.data.buffer, this.data.length + PackContext.CHUNK_LEN);
             this.data = new Uint8Array(buffer);
         }
+
         this.data[this.length++] = b;
     }
 
@@ -63,6 +66,7 @@ class PackContext {
     }
 
     writeCharCodeUtf8(charcode: number) {
+        /* eslint-disable no-bitwise */
         if (charcode < 0x80) {
             this.putByte(charcode);
         } else if (charcode < 0x8_00) {
@@ -73,6 +77,7 @@ class PackContext {
             this.putByte(0x80 | ((charcode >> 6) & 0x3F));
             this.putByte(0x80 | (charcode & 0x3F));
         }
+        /* eslint-enable no-bitwise */
     }
 
     buffer() {

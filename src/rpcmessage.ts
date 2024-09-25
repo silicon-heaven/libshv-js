@@ -141,12 +141,12 @@ class RpcMessage {
                 return new ProtocolError('Response had an error, but this error was not a map');
             }
 
-            const error_map = this.value[KeyError];
-            if (typeof error_map[ERROR_CODE] !== 'number') {
+            const errorMap = this.value[KeyError];
+            if (typeof errorMap[ERROR_CODE] !== 'number') {
                 return new ProtocolError('Response had an error, but this error did not contain at least an error code');
             }
 
-            const code = error_map[ERROR_CODE] as unknown;
+            const code = errorMap[ERROR_CODE] as unknown;
 
             const ErrorType = (() => {
                 switch (code) {

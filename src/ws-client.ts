@@ -18,8 +18,9 @@ const dataToRpcValue = (buff: ArrayBuffer) => {
         default:
             throw new Error(`Unsupported protocol type ${proto}`);
     }
-    const rpc_val = rd.read();
-    return rpc_val;
+
+    const rpcVal = rd.read();
+    return rpcVal;
 };
 
 type SubscriptionCallback = (path: string, method: string, param?: RpcValue) => void;
@@ -127,11 +128,13 @@ class WsClient {
                 this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
                 this.onConnectionFailure(error);
             };
+
             this.callRpcMethod(undefined, 'hello').then(response => {
                 if (response instanceof Error) {
                     handleConnectionError(response);
                     return;
                 }
+
                 const params = makeMap({
                     login: makeMap({
                         password: this.password,
@@ -148,6 +151,7 @@ class WsClient {
                     handleConnectionError(response);
                     return;
                 }
+
                 this.logDebug('SUCCESS: connected to shv broker');
                 this.onConnected();
                 this.pingTimerId = window.setInterval(() => {
@@ -166,23 +170,23 @@ class WsClient {
         });
 
         this.websocket.addEventListener('message', evt => {
-            const rpc_val = dataToRpcValue(evt.data);
-            const rpc_msg = new RpcMessage(rpc_val);
-            this.logDebug(`message received: ${rpc_msg.toCpon()}`);
+            const rpcVal = dataToRpcValue(evt.data);
+            const rpcMsg = new RpcMessage(rpcVal);
+            this.logDebug(`message received: ${rpcMsg.toCpon()}`);
 
-            if (rpc_msg.isSignal()) {
+            if (rpcMsg.isSignal()) {
                 for (const sub of this.subscriptions) {
-                    const shv_path = rpc_msg.shvPath();
-                    const method = rpc_msg.method();
+                    const shvPath = rpcMsg.shvPath();
+                    const method = rpcMsg.method();
 
-                    if (shv_path?.startsWith(sub.path) && method === sub.method) {
-                        sub.callback(shv_path, method, rpc_msg.params());
+                    if (shvPath?.startsWith(sub.path) && method === sub.method) {
+                        sub.callback(shvPath, method, rpcMsg.params());
                     }
                 }
-            } else if (rpc_msg.isRequest()) {
-                this.onRequest(rpc_msg);
-            } else if (rpc_msg.isResponse()) {
-                const requestId = rpc_msg.requestId();
+            } else if (rpcMsg.isRequest()) {
+                this.onRequest(rpcMsg);
+            } else if (rpcMsg.isResponse()) {
+                const requestId = rpcMsg.requestId();
                 if (requestId === undefined) {
                     throw new Error('got RpcResponse without requestId');
                 }
@@ -190,7 +194,7 @@ class WsClient {
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
                     const handler = this.rpcHandlers[Number(requestId)];
                     clearTimeout(handler.timeout_handle);
-                    handler.resolve(rpc_msg.resultOrError());
+                    handler.resolve(rpcMsg.resultOrError());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }
@@ -209,19 +213,21 @@ class WsClient {
     callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<RpcResponse>;
     callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue) {
         const rq = new RpcMessage();
-        const rq_id = this.requestId++;
-        rq.setRequestId(rq_id);
+        const rqId = this.requestId++;
+        rq.setRequestId(rqId);
         if (shv_path !== undefined) {
             rq.setShvPath(shv_path);
         }
+
         rq.setMethod(method);
         if (params !== undefined) {
             rq.setParams(params);
         }
+
         this.sendRpcMessage(rq);
 
         const promise = new Promise<RpcResponse>(resolve => {
-            this.rpcHandlers[rq_id] = {resolve, timeout_handle: self.setTimeout(() => {
+            this.rpcHandlers[rqId] = {resolve, timeout_handle: self.setTimeout(() => {
                 resolve(new MethodCallTimeout(makeIMap({
                     [ERROR_CODE]: ErrorCode.MethodCallTimeout,
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
@@ -235,11 +241,11 @@ class WsClient {
     sendRpcMessage(rpc_msg: RpcMessage) {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.logDebug('sending rpc message:', rpc_msg.toCpon());
-            const msg_data = new Uint8Array(rpc_msg.toChainPack());
+            const msgData = new Uint8Array(rpc_msg.toChainPack());
 
             const wr = new ChainPackWriter();
-            wr.writeUIntData(msg_data.length + 1);
-            const dgram = new Uint8Array(wr.ctx.length + 1 + msg_data.length);
+            wr.writeUIntData(msgData.length + 1);
+            const dgram = new Uint8Array(wr.ctx.length + 1 + msgData.length);
             let ix = 0;
             for (let i = 0; i < wr.ctx.length; i++) {
                 dgram[ix++] = wr.ctx.data[i];
@@ -247,9 +253,10 @@ class WsClient {
 
             dgram[ix++] = ChainpackProtocolType;
 
-            for (const msg_datum of msg_data) {
-                dgram[ix++] = msg_datum;
+            for (const msgDatum of msgData) {
+                dgram[ix++] = msgDatum;
             }
+
             this.logDebug(`sending ${dgram.length} bytes of data`);
             this.websocket.send(dgram.buffer);
         }
@@ -260,6 +267,7 @@ class WsClient {
             this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
             return;
         }
+
         // If this path:method has not been subscribed on the broker, do it now
         if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
             this.callRpcMethod('.broker/app', 'subscribe', makeMap({
@@ -268,6 +276,7 @@ class WsClient {
                 this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
             });
         }
+
         this.subscriptions.push({
             subscriber,
             path,
@@ -282,11 +291,13 @@ class WsClient {
             this.logDebug(`No such subscription ${path}:${method} for subscriber ${subscriber}`);
             return;
         }
+
         this.subscriptions.splice(idx, 1);
         // Unsubscribe on the broker only if there are no other subscriptions of this path:method
         if (this.subscriptions.some(val => val.path === path && val.method === method)) {
             return;
         }
+
         this.callRpcMethod('.broker/app', 'unsubscribe', makeMap({
             method, path,
         })).catch(() => {
