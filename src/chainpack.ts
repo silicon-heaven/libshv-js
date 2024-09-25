@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import {utf8ToString} from './cpon';
 import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
 import {UnpackContext, PackContext} from './cpcontext';
@@ -26,21 +27,21 @@ enum PackingSchema {
 const SHV_EPOCH_MSEC = 1_517_529_600_000;
 const INVALID_MIN_OFFSET_FROM_UTC = (-64 * 15);
 
-const div_int = (n: bigint, d: bigint) => {
+const divInt = (n: bigint, d: bigint) => {
     const r = n % d;
     return [(n - r) / d, r] as const;
 };
 
-const uint8_array_to_bigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
-    let is_neg = false;
+const uint8ArrayBoBigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
+    let isNeg = false;
 
     if (type === 'Int') {
         if (bytes.length < 5) {
-            const sign_mask = 0x80 >> bytes.length;
-            is_neg = Boolean(bytes[0] & sign_mask);
-            bytes[0] &= ~sign_mask;
+            const signMask = 0x80 >> bytes.length;
+            isNeg = Boolean(bytes[0] & signMask);
+            bytes[0] &= ~signMask;
         } else {
-            is_neg = Boolean(bytes[1] & 128);
+            isNeg = Boolean(bytes[1] & 128);
             bytes[1] &= ~128;
         }
     }
@@ -50,18 +51,18 @@ const uint8_array_to_bigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
         ret = (ret * BigInt(256)) + BigInt(byte);
     }
 
-    if (is_neg) {
+    if (isNeg) {
         ret = -ret;
     }
 
     return ret;
 };
 
-const number_to_uint8_array = (num: bigint) => {
+const numberToUint8Array = (num: bigint) => {
     let bytes = new Uint8Array(8);
     let len = 0;
     while (true) {
-        const res = div_int(num, 256n);
+        const res = divInt(num, 256n);
         num = res[0];
         bytes[len++] = Number(res[1]);
         if (num === 0n) {
@@ -74,12 +75,13 @@ const number_to_uint8_array = (num: bigint) => {
     return bytes;
 };
 
-const significant_bits_count = (num: bigint) => {
+const significantBitsCount = (num: bigint) => {
     let ret = 0;
     while (num > 0) {
         ret++;
         num >>= 1n;
     }
+
     return ret;
 };
 
@@ -99,100 +101,120 @@ class ChainPackReader {
             codePointAt = this.ctx.getByte();
         }
 
-        const impl_return = (x: RpcValueType) => {
+        const implReturn = (x: RpcValueType) => {
             const ret = meta !== undefined ? new RpcValueWithMetaData(x, meta) : x;
             return ret;
         };
 
         if (codePointAt < PackingSchema.Null) {
             if (codePointAt >= PackingSchema.IntThreshold) {
-                return impl_return(codePointAt - 64);
+                return implReturn(codePointAt - 64);
             }
-            return impl_return(new UInt(codePointAt));
+
+            return implReturn(new UInt(codePointAt));
         }
+
         switch (codePointAt) {
             case PackingSchema.Null: {
-                return impl_return(undefined);
+                return implReturn(undefined);
             }
+
             case PackingSchema.True: {
-                return impl_return(true);
+                return implReturn(true);
             }
+
             case PackingSchema.False: {
-                return impl_return(false);
+                return implReturn(false);
             }
+
             case PackingSchema.Int: {
-                return impl_return(this.readIntData());
+                return implReturn(this.readIntData());
             }
+
             case PackingSchema.UInt: {
-                return impl_return(new UInt(this.readUIntData()));
+                return implReturn(new UInt(this.readUIntData()));
             }
+
             case PackingSchema.Double: {
                 const data = new Uint8Array(8);
                 for (let i = 0; i < 8; i++) {
                     data[i] = this.ctx.getByte();
                 }
-                return impl_return(new Double(new DataView(data.buffer).getFloat64(0, true))); // little endian
+
+                return implReturn(new Double(new DataView(data.buffer).getFloat64(0, true))); // little endian
             }
+
             case PackingSchema.Decimal: {
                 const mant = this.readIntData();
                 const exp = this.readIntData();
-                return impl_return(new Decimal(mant, exp));
+                return implReturn(new Decimal(mant, exp));
             }
+
             case PackingSchema.DateTime: {
                 let bi = this.readUIntDataHelper('UInt');
-                const has_tz_offset = bi & 1n;
-                const has_not_msec = bi & 2n;
+                const hasTzOffset = bi & 1n;
+                const hasNotMsec = bi & 2n;
                 bi >>= 2n;
 
                 let offset = 0;
-                if (has_tz_offset) {
+                if (hasTzOffset) {
                     offset = Number(bi & 0x7Fn);
                     if (offset & 0x40) {
                         // sign extension
                         offset -= 128;
                     }
+
                     bi >>= 7n;
                 }
 
                 offset *= 15;
 
                 if (offset === INVALID_MIN_OFFSET_FROM_UTC) {
-                    return impl_return(undefined);
+                    return implReturn(undefined);
                 }
 
                 let msec = Number(bi);
-                if (has_not_msec) {
+                if (hasNotMsec) {
                     msec *= 1000;
                 }
+
                 msec += SHV_EPOCH_MSEC;
                 msec -= offset * 60_000;
                 return withOffset(new Date(msec), offset);
             }
+
             case PackingSchema.Map: {
-                return impl_return(this.readMap());
+                return implReturn(this.readMap());
             }
+
             case PackingSchema.IMap: {
-                return impl_return(this.readIMap());
+                return implReturn(this.readIMap());
             }
+
             case PackingSchema.List: {
-                return impl_return(this.readList());
+                return implReturn(this.readList());
             }
+
             case PackingSchema.Blob: {
-                const str_len = this.readUIntData();
-                const arr = new Uint8Array(str_len);
-                for (let i = 0; i < str_len; i++) {
+                const strLen = this.readUIntData();
+                const arr = new Uint8Array(strLen);
+                for (let i = 0; i < strLen; i++) {
                     arr[i] = this.ctx.getByte();
                 }
-                return impl_return(arr.buffer);
+
+                return implReturn(arr.buffer);
             }
+
             case PackingSchema.String: {
-                const str_len = this.readUIntData();
-                const arr = new Uint8Array(str_len);
-                for (let i = 0; i < str_len; i++) {
+                const strLen = this.readUIntData();
+                const arr = new Uint8Array(strLen);
+                for (let i = 0; i < strLen; i++) {
                     arr[i] = this.ctx.getByte();
                 }
-                return impl_return(utf8ToString(arr.buffer));
+
+                return implReturn(utf8ToString(arr.buffer));
             }
+
             case PackingSchema.CString: {
                 // variation of CponReader.readCString()
                 const pctx = new PackContext();
@@ -218,8 +240,10 @@ class ChainPackReader {
                         pctx.putByte(b);
                     }
                 }
-                return impl_return(utf8ToString(pctx.buffer()));
+
+                return implReturn(utf8ToString(pctx.buffer()));
             }
+
             default:
                 throw new TypeError('ChainPack - Invalid type info: ' + codePointAt);
         }
@@ -228,40 +252,45 @@ class ChainPackReader {
     readUIntDataHelper(type: 'Int' | 'UInt') {
         let num = 0;
         const head = this.ctx.getByte();
-        let bytes_to_read_cnt;
+        let bytesToReadCnt;
         switch (0) {
             case head & 128: {
-                bytes_to_read_cnt = 0;
+                bytesToReadCnt = 0;
                 num = head & 127;
                 break;
             }
+
             case head & 64: {
-                bytes_to_read_cnt = 1;
+                bytesToReadCnt = 1;
                 num = head & 63;
                 break;
             }
+
             case head & 32: {
-                bytes_to_read_cnt = 2;
+                bytesToReadCnt = 2;
                 num = head & 31;
                 break;
             }
+
             case head & 16: {
-                bytes_to_read_cnt = 3;
+                bytesToReadCnt = 3;
                 num = head & 15;
                 break;
             }
+
             default: {
-                bytes_to_read_cnt = (head & 0xF) + 4;
+                bytesToReadCnt = (head & 0xF) + 4;
             }
         }
-        const bytes = new Uint8Array(bytes_to_read_cnt + 1);
+
+        const bytes = new Uint8Array(bytesToReadCnt + 1);
         bytes[0] = num;
-        for (let i = 0; i < bytes_to_read_cnt; i++) {
+        for (let i = 0; i < bytesToReadCnt; i++) {
             const r = this.ctx.getByte();
             bytes[i + 1] = r;
         }
 
-        return uint8_array_to_bigint(bytes, type);
+        return uint8ArrayBoBigint(bytes, type);
     }
 
     readIntData() {
@@ -269,9 +298,11 @@ class ChainPackReader {
         if (val <= Number.MIN_SAFE_INTEGER) {
             return Number.MIN_SAFE_INTEGER;
         }
+
         if (val >= Number.MAX_SAFE_INTEGER) {
             return Number.MAX_SAFE_INTEGER;
         }
+
         return Number(val);
     }
 
@@ -280,6 +311,7 @@ class ChainPackReader {
         if (val >= Number.MAX_SAFE_INTEGER) {
             return Number.MAX_SAFE_INTEGER;
         }
+
         return Number(val);
     }
 
@@ -291,8 +323,10 @@ class ChainPackReader {
                 this.ctx.getByte();
                 break;
             }
+
             lst.push(this.read());
         }
+
         return lst;
     }
 
@@ -321,6 +355,7 @@ class ChainPackReader {
                 this.ctx.getByte();
                 break;
             }
+
             const key = this.read();
             const val = this.read();
             if (map[shvMapType] === 'metamap' && typeof key === 'string') {
@@ -335,6 +370,7 @@ class ChainPackReader {
                 throw new TypeError('Malformed map, invalid key');
             }
         }
+
         return map;
     }
 }
@@ -351,6 +387,7 @@ class ChainPackWriter {
             this.writeMeta(rpc_val.meta);
             rpc_val = rpc_val.value;
         }
+
         switch (true) {
             case rpc_val === undefined:
                 this.ctx.putByte(PackingSchema.Null);
@@ -390,6 +427,7 @@ class ChainPackWriter {
                         this.writeMap(rpc_val);
                         break;
                 }
+
                 break;
             default:
                 console.log('Can\'t serialize', rpc_val);
@@ -398,49 +436,55 @@ class ChainPackWriter {
     }
 
     writeUIntDataHelper(num: bigint, type: 'Int' | 'UInt') {
-        const is_negative = num < 0;
-        if (is_negative) {
+        const isNegative = num < 0;
+        if (isNegative) {
             num = -num;
         }
-        const significant_bits = significant_bits_count(num) + (/* one more needed for sign bit */ type === 'Int' ? 1 : 0);
-        const bytes_needed = significant_bits <= 28 ? Math.trunc((significant_bits - 1) / 7) + 1 : Math.trunc((significant_bits - 1) / 8) + 2;
 
-        switch (bytes_needed) {
+        const significantBits = significantBitsCount(num) + (/* one more needed for sign bit */ type === 'Int' ? 1 : 0);
+        const bytesNeeded = significantBits <= 28 ? Math.trunc((significantBits - 1) / 7) + 1 : Math.trunc((significantBits - 1) / 8) + 2;
+
+        switch (bytesNeeded) {
             case 0:
                 throw new Error(`Failed to count bytes needed for ${num}`);
             case 1:
-                if (is_negative) {
+                if (isNegative) {
                     num |= 0b0100_0000n;
                 }
+
                 break;
             case 2:
                 num |= 0b1000_0000n << 8n;
-                if (is_negative) {
+                if (isNegative) {
                     num |= 0b0010_0000n << 8n;
                 }
+
                 break;
             case 3:
                 num |= 0b1100_0000n << 16n;
-                if (is_negative) {
+                if (isNegative) {
                     num |= 0b0001_0000n << 16n;
                 }
+
                 break;
             case 4:
                 num |= 0b1110_0000n << 24n;
-                if (is_negative) {
+                if (isNegative) {
                     num |= 0b0000_1000n << 24n;
                 }
+
                 break;
             default:
-                num |= 0b1111_0000n << BigInt((bytes_needed - 1) * 8);
-                num |= BigInt(bytes_needed - 4 /* n is offset by 4 */ - 1 /* for the control byte */) << BigInt((bytes_needed - 1) * 8);
-                if (is_negative) {
-                    num |= 0b1000_0000n << BigInt((bytes_needed - 2) * 8);
+                num |= 0b1111_0000n << BigInt((bytesNeeded - 1) * 8);
+                num |= BigInt(bytesNeeded - 4 /* n is offset by 4 */ - 1 /* for the control byte */) << BigInt((bytesNeeded - 1) * 8);
+                if (isNegative) {
+                    num |= 0b1000_0000n << BigInt((bytesNeeded - 2) * 8);
                 }
+
                 break;
         }
 
-        const bytes = number_to_uint8_array(num);
+        const bytes = numberToUint8Array(num);
         for (const byte of bytes) {
             this.ctx.putByte(byte);
         }
@@ -537,6 +581,7 @@ class ChainPackWriter {
         for (const element of lst) {
             this.write(element);
         }
+
         this.ctx.putByte(PackingSchema.Term);
     }
 
@@ -562,22 +607,23 @@ class ChainPackWriter {
             }
 
             if (map[shvMapType] === 'imap') {
-                const int_key = Number(key);
-                if (Number.isNaN(int_key)) {
+                const intKey = Number(key);
+                if (Number.isNaN(intKey)) {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
-                this.writeInt(int_key);
+                this.writeInt(intKey);
             } else if (map[shvMapType] === 'metamap') {
-                const int_key = Number(key);
-                if (Number.isNaN(int_key)) {
+                const intKey = Number(key);
+                if (Number.isNaN(intKey)) {
                     this.writeJSString(key.toString());
                 } else {
-                    this.writeInt(int_key);
+                    this.writeInt(intKey);
                 }
             } else {
                 this.writeJSString(key.toString());
             }
+
             this.write(value);
         }
 

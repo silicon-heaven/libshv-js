@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
@@ -9,6 +10,7 @@ const hexify = (byte: number) => {
     if (byte < 16) {
         return 97 + byte - 10;
     }
+
     return '?'.codePointAt(0)!;
 };
 
@@ -16,37 +18,41 @@ const unhex = (byte: number) => {
     if (byte >= 48 && byte <= 57) { // 0-9
         return byte - 48;
     }
+
     if (byte >= 65 && byte <= 70) { // A-F
         return byte - 65 + 10;
     }
+
     if (byte >= 97 && byte <= 102) { // a-f
         return byte - 97 + 10;
     }
+
     throw new TypeError('Invalid HEX digit: ' + byte);
 };
 
 const utf8ToString = (bytearray: ArrayBuffer) => {
-    const uint8_array = new Uint8Array(bytearray);
+    const uint8Array = new Uint8Array(bytearray);
     let str = '';
-    for (let i = 0; i < uint8_array.length; i++) {
-        const value = uint8_array[i];
+    for (let i = 0; i < uint8Array.length; i++) {
+        const value = uint8Array[i];
 
         if (value < 0x80) {
             str += String.fromCodePoint(value);
         } else if (value > 0xBF && value < 0xE0) {
-            str += String.fromCodePoint(((value & 0x1F) << 6) | (uint8_array[i + 1] & 0x3F));
+            str += String.fromCodePoint(((value & 0x1F) << 6) | (uint8Array[i + 1] & 0x3F));
             i += 1;
         } else if (value > 0xDF && value < 0xF0) {
-            str += String.fromCodePoint(((value & 0x0F) << 12) | ((uint8_array[i + 1] & 0x3F) << 6) | (uint8_array[i + 2] & 0x3F));
+            str += String.fromCodePoint(((value & 0x0F) << 12) | ((uint8Array[i + 1] & 0x3F) << 6) | (uint8Array[i + 2] & 0x3F));
             i += 2;
         } else {
             // surrogate pair
-            const char_code = (((value & 0x07) << 18) | ((uint8_array[i + 1] & 0x3F) << 12) | ((uint8_array[i + 2] & 0x3F) << 6) | (uint8_array[i + 3] & 0x3F)) - 0x01_00_00;
+            const charCode = (((value & 0x07) << 18) | ((uint8Array[i + 1] & 0x3F) << 12) | ((uint8Array[i + 2] & 0x3F) << 6) | (uint8Array[i + 3] & 0x3F)) - 0x01_00_00;
 
-            str += String.fromCodePoint((char_code >> 10) | 0xD8_00, (char_code & 0x03_FF) | 0xDC_00);
+            str += String.fromCodePoint((charCode >> 10) | 0xD8_00, (charCode & 0x03_FF) | 0xDC_00);
             i += 3;
         }
     }
+
     return str;
 };
 
@@ -64,7 +70,7 @@ class CponReader {
             meta = this.readMetaMap();
         }
 
-        const impl_return = (x: RpcValueType) => {
+        const implReturn = (x: RpcValueType) => {
             const ret = meta !== undefined ? new RpcValueWithMetaData(x, meta) : x;
             return ret;
         };
@@ -74,19 +80,20 @@ class CponReader {
         // console.log("CHAR:", b, String.fromCodePoint(b));
         // [0-9+-]
         if ((b >= 48 && b <= 57) || b === 43 || b === 45) {
-            return impl_return(this.readNumber());
+            return implReturn(this.readNumber());
         }
 
         if (b === '"'.codePointAt(0)) {
-            return impl_return(this.readCString());
+            return implReturn(this.readCString());
         }
 
         if (b === 'b'.codePointAt(0)) {
             this.ctx.getByte();
             b = this.ctx.peekByte();
             if (b === '"'.codePointAt(0)) {
-                return impl_return(this.readBlobEsc());
+                return implReturn(this.readBlobEsc());
             }
+
             throw new TypeError('Invalid Blob prefix.');
         }
 
@@ -94,25 +101,27 @@ class CponReader {
             this.ctx.getByte();
             b = this.ctx.peekByte();
             if (b === '"'.codePointAt(0)) {
-                return impl_return(this.readBlobHex());
+                return implReturn(this.readBlobHex());
             }
+
             throw new TypeError('Invalid HEX Blob prefix.');
         }
 
         if (b === '['.codePointAt(0)) {
-            return impl_return(this.readList());
+            return implReturn(this.readList());
         }
 
         if (b === '{'.codePointAt(0)) {
-            return impl_return(this.readMap());
+            return implReturn(this.readMap());
         }
 
         if (b === 'i'.codePointAt(0)) {
             this.ctx.getByte();
             b = this.ctx.peekByte();
             if (b === '{'.codePointAt(0)) {
-                return impl_return(this.readIMap());
+                return implReturn(this.readIMap());
             }
+
             throw new TypeError('Invalid IMap prefix.');
         }
 
@@ -120,24 +129,25 @@ class CponReader {
             this.ctx.getByte();
             b = this.ctx.peekByte();
             if (b === '"'.codePointAt(0)) {
-                return impl_return(this.readDateTime());
+                return implReturn(this.readDateTime());
             }
+
             throw new TypeError('Invalid DateTime prefix.');
         }
 
         if (b === 't'.codePointAt(0)) {
             this.ctx.getBytes('true');
-            return impl_return(true);
+            return implReturn(true);
         }
 
         if (b === 'f'.codePointAt(0)) {
             this.ctx.getBytes('false');
-            return impl_return(false);
+            return implReturn(false);
         }
 
         if (b === 'n'.codePointAt(0)) {
             this.ctx.getBytes('null');
-            return impl_return(undefined);
+            return implReturn(undefined);
         }
 
         throw new TypeError('Malformed Cpon input.');
@@ -183,16 +193,20 @@ class CponReader {
                         } else {
                             throw new TypeError('Malformed comment');
                         }
+
                         break;
                     }
+
                     case KEY_DELIM: {
                         this.ctx.getByte();
                         continue;
                     }
+
                     case FIELD_DELIM: {
                         this.ctx.getByte();
                         continue;
                     }
+
                     default:
                         return;
                 }
@@ -210,7 +224,7 @@ class CponReader {
         let min = 0;
         let sec = 0;
         let msec = 0;
-        let utc_offset = 0;
+        let utcOffset = 0;
 
         this.ctx.getByte(); // eat '"'
         let b = this.ctx.peekByte();
@@ -226,30 +240,35 @@ class CponReader {
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
+
         month = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
+
         day = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ' '.codePointAt(0) && b !== 'T'.codePointAt(0)) {
             throw new TypeError('Malformed date-time separator in DateTime');
         }
+
         hour = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
+
         min = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
+
         sec = Number(this.readInt());
 
         b = this.ctx.peekByte();
@@ -271,13 +290,15 @@ class CponReader {
             if (!(n === 2 || n === 4)) {
                 throw new TypeError('Malformed TS offset in DateTime.');
             }
+
             if (n === 2) {
-                utc_offset = 60 * val;
+                utcOffset = 60 * val;
             } else if (n === 4) {
-                utc_offset = (60 * (Math.trunc(val / 100))) + (val % 100);
+                utcOffset = (60 * (Math.trunc(val / 100))) + (val % 100);
             }
+
             if (b === '-'.codePointAt(0)) {
-                utc_offset = -utc_offset;
+                utcOffset = -utcOffset;
             }
         }
 
@@ -287,9 +308,9 @@ class CponReader {
         }
 
         // let epoch_sec = CponReader.timegm(year, month, mday, hour, min, sec);
-        let epoch_msec = Date.UTC(year, month - 1, day, hour, min, sec, msec);
-        epoch_msec -= utc_offset * 60_000;
-        return withOffset(new Date(epoch_msec), utc_offset);
+        let epochMsec = Date.UTC(year, month - 1, day, hour, min, sec, msec);
+        epochMsec -= utcOffset * 60_000;
+        return withOffset(new Date(epochMsec), utcOffset);
     }
 
     readCString() {
@@ -335,6 +356,7 @@ class CponReader {
                 pctx.putByte(b);
             }
         }
+
         return utf8ToString(pctx.buffer());
     }
 
@@ -376,6 +398,7 @@ class CponReader {
                 throw new TypeError('Escaped Blob characters must be lower than 128, code: ' + b);
             }
         }
+
         return pctx.buffer();
     }
 
@@ -392,6 +415,7 @@ class CponReader {
                 pctx.putByte(b2);
             }
         }
+
         return pctx.buffer();
     }
 
@@ -405,9 +429,11 @@ class CponReader {
                 this.ctx.getByte();
                 break;
             }
+
             const item = this.read();
             lst.push(item);
         }
+
         return lst;
     }
 
@@ -433,10 +459,12 @@ class CponReader {
             if (b < 0) {
                 break;
             }
+
             if (b === 43 || b === 45) { // '+','-'
                 if (n !== 0) {
                     break;
                 }
+
                 this.ctx.getByte();
                 if (b === 45) {
                     neg = 1;
@@ -445,9 +473,11 @@ class CponReader {
                 if (n === 1 && val !== 0) {
                     break;
                 }
+
                 if (n !== 1) {
                     break;
                 }
+
                 this.ctx.getByte();
                 base = 16;
             } else if (b >= 48 && b <= 57) { // '0' - '9'
@@ -458,6 +488,7 @@ class CponReader {
                 if (base !== 16) {
                     break;
                 }
+
                 this.ctx.getByte();
                 val *= base;
                 val += b - 65 + 10;
@@ -465,6 +496,7 @@ class CponReader {
                 if (base !== 16) {
                     break;
                 }
+
                 this.ctx.getByte();
                 val *= base;
                 val += b - 97 + 10;
@@ -472,9 +504,11 @@ class CponReader {
                 break;
             }
         }
+
         if (neg) {
             val = -val;
         }
+
         return val;
     }
 
@@ -482,17 +516,17 @@ class CponReader {
         let mantisa = 0;
         let exponent = 0;
         let decimals = 0;
-        let dec_cnt = 0;
-        let is_decimal = false;
-        let is_uint = false;
-        let is_neg = false;
+        let decCnt = 0;
+        let isDecimal = false;
+        let isUint = false;
+        let isNeg = false;
 
         let b = this.ctx.peekByte();
         if (b === 43) {// '+'
-            is_neg = false;
+            isNeg = false;
             b = this.ctx.getByte();
         } else if (b === 45) {// '-'
-            is_neg = true;
+            isNeg = true;
             b = this.ctx.getByte();
         }
 
@@ -502,52 +536,61 @@ class CponReader {
             while (true) {
                 switch (b) {
                     case 'u'.codePointAt(0): {
-                        is_uint = true;
+                        isUint = true;
                         this.ctx.getByte();
                         return;
                     }
+
                     case '.'.codePointAt(0): {
-                        is_decimal = true;
+                        isDecimal = true;
                         this.ctx.getByte();
                         const ix1 = this.ctx.index;
                         decimals = Number(this.readInt());
                         // if(n < 0)
                         //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
-                        dec_cnt = this.ctx.index - ix1;
+                        decCnt = this.ctx.index - ix1;
                         b = this.ctx.peekByte();
                         if (b >= 0) {
                             continue;
                         }
+
                         return;
                     }
+
                     case 'e'.codePointAt(0):
                     case 'E'.codePointAt(0): {
-                        is_decimal = true;
+                        isDecimal = true;
                         this.ctx.getByte();
                         const ix1 = this.ctx.index;
                         exponent = Number(this.readInt());
                         if (ix1 === this.ctx.index) {
                             throw new TypeError('Malformed number exponential part.');
                         }
+
                         return;
                     }
+
                     default:
                         return;
                 }
             }
         })();
-        if (is_decimal) {
-            for (let i = 0; i < dec_cnt; ++i) {
+
+        if (isDecimal) {
+            for (let i = 0; i < decCnt; ++i) {
                 mantisa *= 10;
             }
+
             mantisa += decimals;
-            mantisa = is_neg ? -mantisa : mantisa;
-            return new Decimal(mantisa, exponent - dec_cnt);
+            mantisa = isNeg ? -mantisa : mantisa;
+            return new Decimal(mantisa, exponent - decCnt);
         }
-        if (is_uint) {
+
+        if (isUint) {
             return new UInt(mantisa);
         }
-        return is_neg ? -mantisa : mantisa;
+
+        return isNeg ? -mantisa : mantisa;
     }
 
     private implReadMap(map_type: 'map', terminator: number): ShvMap;
@@ -565,6 +608,7 @@ class CponReader {
                 this.ctx.getByte();
                 break;
             }
+
             const key = this.read();
             if (key instanceof RpcValueWithMetaData) {
                 throw new TypeError('Map/IMap/MetaMap key can\'t have its own MetaData');
@@ -585,6 +629,7 @@ class CponReader {
                 throw new TypeError('Malformed map, invalid key');
             }
         }
+
         return map;
     }
 }
@@ -642,6 +687,7 @@ class CponWriter {
                         this.writeMap(rpc_val);
                         break;
                 }
+
                 break;
             default:
                 console.log('Can\'t serialize rpc value', rpc_val);
@@ -679,6 +725,7 @@ class CponWriter {
                     this.ctx.writeCharCodeUtf8(charcode);
             }
         }
+
         this.ctx.writeStringUtf8('"');
     }
 
@@ -712,6 +759,7 @@ class CponWriter {
                     }
             }
         }
+
         this.ctx.writeStringUtf8('"');
     }
 
@@ -720,32 +768,37 @@ class CponWriter {
             this.ctx.writeStringUtf8('d""');
             return;
         }
-        const epoch_msec = dt.getTime();
-        let utc_offset = dt.utc_offset;
-        const local_msec = epoch_msec + (60_000 * (utc_offset ?? 0));
-        let s = new Date(local_msec).toISOString();
-        const rtrim = (local_msec % 1000) ? 1 : 5;
+
+        const epochMsec = dt.getTime();
+        let utcOffset = dt.utc_offset;
+        const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));
+        let s = new Date(localMsec).toISOString();
+        const rtrim = (localMsec % 1000) ? 1 : 5;
         this.ctx.writeStringUtf8('d"');
         for (let i = 0; i < s.length - rtrim; i++) {
             this.ctx.putByte(s.codePointAt(i)!);
         }
-        if (utc_offset === undefined || utc_offset === 0) {
+
+        if (utcOffset === undefined || utcOffset === 0) {
             this.ctx.writeStringUtf8('Z');
         } else {
-            if (utc_offset < 0) {
+            if (utcOffset < 0) {
                 this.ctx.writeStringUtf8('-');
-                utc_offset = -utc_offset;
+                utcOffset = -utcOffset;
             } else {
                 this.ctx.writeStringUtf8('+');
             }
-            s = (Math.trunc(utc_offset / 60)).toString().padStart(2, '0');
-            if (utc_offset % 60) {
-                s += (utc_offset % 60).toString().padStart(2, '0');
+
+            s = (Math.trunc(utcOffset / 60)).toString().padStart(2, '0');
+            if (utcOffset % 60) {
+                s += (utcOffset % 60).toString().padStart(2, '0');
             }
+
             for (let i = 0; i < s.length; i++) {
                 this.ctx.putByte(s.codePointAt(i)!);
             }
         }
+
         this.ctx.writeStringUtf8('"');
     }
 
@@ -774,27 +827,29 @@ class CponWriter {
             if (value === undefined) {
                 continue;
             }
+
             if (!first) {
                 this.ctx.putByte(','.codePointAt(0)!);
                 this.doIndentIfNotOneliner(map);
             }
+
             first = false;
 
             if (map[shvMapType] === 'imap') {
-                const int_key = Number(key);
-                if (Number.isNaN(int_key)) {
+                const intKey = Number(key);
+                if (Number.isNaN(intKey)) {
                     throw new TypeError('Invalid NaN IMap key');
                 }
 
-                this.writeInt(int_key);
+                this.writeInt(intKey);
             } else if (map[shvMapType] === 'metamap') {
-                const int_key = Number(key);
-                if (Number.isNaN(int_key)) {
+                const intKey = Number(key);
+                if (Number.isNaN(intKey)) {
                     this.ctx.putByte('"'.codePointAt(0)!);
                     this.ctx.writeStringUtf8(key.toString());
                     this.ctx.putByte('"'.codePointAt(0)!);
                 } else {
-                    this.writeInt(int_key);
+                    this.writeInt(intKey);
                 }
             } else {
                 this.writeJSString(key.toString());
@@ -818,8 +873,10 @@ class CponWriter {
                 this.ctx.putByte(','.codePointAt(0)!);
                 this.doIndentIfNotOneliner(lst);
             }
+
             this.write(element);
         }
+
         this.decreaseIndentIfNotOneLiner(lst);
         this.doIndentIfNotOneliner(lst);
         this.ctx.putByte(']'.codePointAt(0)!);
@@ -841,6 +898,7 @@ class CponWriter {
         if (!s.includes('.')) {
             s += '.';
         }
+
         this.ctx.writeStringUtf8(s);
     }
 
@@ -851,29 +909,33 @@ class CponWriter {
             mantisa = -mantisa;
             this.ctx.putByte('-'.codePointAt(0)!);
         }
+
         let str = mantisa.toString();
         const n = str.length;
-        const dec_places = -exponent;
-        if (dec_places > 0 && dec_places < n) {
-            const dot_ix = n - dec_places;
-            str = str.slice(0, dot_ix) + '.' + str.slice(dot_ix);
-        } else if (dec_places > 0 && dec_places <= 3) {
-            const extra_0_cnt = dec_places - n;
+        const decPlaces = -exponent;
+        if (decPlaces > 0 && decPlaces < n) {
+            const dotIx = n - decPlaces;
+            str = str.slice(0, dotIx) + '.' + str.slice(dotIx);
+        } else if (decPlaces > 0 && decPlaces <= 3) {
+            const extraZeroCnt = decPlaces - n;
             let str0 = '0.';
-            for (let i = 0; i < extra_0_cnt; ++i) {
+            for (let i = 0; i < extraZeroCnt; ++i) {
                 str0 += '0';
             }
+
             str = str0 + str;
-        } else if (dec_places < 0 && n + exponent <= 9) {
+        } else if (decPlaces < 0 && n + exponent <= 9) {
             for (let i = 0; i < exponent; ++i) {
                 str += '0';
             }
+
             str += '.';
-        } else if (dec_places === 0) {
+        } else if (decPlaces === 0) {
             str += '.';
         } else {
             str += 'e' + exponent;
         }
+
         for (let i = 0; i < str.length; ++i) {
             this.ctx.putByte(str.codePointAt(i)!);
         }
