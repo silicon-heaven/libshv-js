@@ -148,7 +148,7 @@ class RpcMessage {
 
             const code = errorMap[ERROR_CODE] as unknown;
 
-            const ErrorType = (() => {
+            const errorTypeCtor = (() => {
                 switch (code) {
                     case ErrorCode.InvalidRequest: return InvalidRequest;
                     case ErrorCode.MethodNotFound: return MethodNotFound;
@@ -166,7 +166,7 @@ class RpcMessage {
                 }
             })();
 
-            return new ErrorType(this.value[KeyError] as unknown as ErrorMap);
+            return new errorTypeCtor(this.value[KeyError] as unknown as ErrorMap);
         }
 
         if (Object.hasOwn(this.value, KeyResult)) {

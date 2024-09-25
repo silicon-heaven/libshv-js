@@ -644,6 +644,6 @@ const fromChainPack = (buffer: ArrayBuffer) => {
     return reader.read();
 };
 
-const ChainpackProtocolType = 1;
+const CHAINPACK_PROTOCOL_TYPE = 1;
 
-export {toChainPack, fromChainPack, ChainPackReader, ChainPackWriter, ChainpackProtocolType};
+export {toChainPack, fromChainPack, ChainPackReader, ChainPackWriter, CHAINPACK_PROTOCOL_TYPE};
