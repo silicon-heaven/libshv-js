@@ -4,6 +4,7 @@ import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessage, type RpcResponse, Meth
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
+const DEFAULT_PING_INTERVAL = 30 * 1000;
 
 const dataToRpcValue = (buff: ArrayBuffer) => {
     const rd: ChainPackReader | CponReader = new ChainPackReader(buff);
@@ -39,6 +40,7 @@ type WsClientOptions = {
     password: string;
     loginType?: 'PLAIN' | 'AZURE';
     timeout?: number;
+    pingInterval?: number;
     wsUri: string;
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
@@ -74,6 +76,8 @@ type DirResult = Array<IMap<{
 
 class WsClient {
     requestId = 1;
+    pingTimerId = -1;
+
     rpcHandlers: Array<{
         resolve: RpcResponseResolver;
         timeout_handle: number;
@@ -92,6 +96,7 @@ class WsClient {
     onDisconnected: WsClientOptions['onDisconnected'];
     onRequest: WsClientOptions['onRequest'];
     timeout: WsClientOptions['timeout'];
+    pingInterval: WsClientOptions['pingInterval'];
 
     constructor(options: WsClientOptions) {
         if (typeof options !== 'object') {
@@ -108,6 +113,7 @@ class WsClient {
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
 
+        this.pingInterval = options.pingInterval ?? DEFAULT_PING_INTERVAL;
         this.onConnected = options.onConnected ?? (() => {/* nothing */});
         this.onConnectionFailure = options.onConnectionFailure ?? (() => {/* nothing */});
         this.onDisconnected = options.onDisconnected ?? (() => {/* nothing */});
@@ -144,6 +150,7 @@ class WsClient {
                 }
                 this.logDebug('SUCCESS: connected to shv broker');
                 this.onConnected();
+                this.pingTimerId = window.setInterval(() => this.sendPing(), this.pingInterval);
             }).catch(() => {
                 this.logDebug('FAILURE: couldn\' connected to shv broker');
             });
@@ -153,6 +160,7 @@ class WsClient {
             this.logDebug('DISCONNECTED');
             this.subscriptions.length = 0;
             this.onDisconnected();
+            window.clearInterval(this.pingTimerId);
         });
 
         this.websocket.addEventListener('message', evt => {
@@ -223,7 +231,7 @@ class WsClient {
     }
 
     sendRpcMessage(rpc_msg: RpcMessage) {
-        if (this.websocket && this.websocket.readyState === 1) {
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.logDebug('sending rpc message:', rpc_msg.toCpon());
             const msg_data = new Uint8Array(rpc_msg.toChainPack());
 
@@ -282,6 +290,14 @@ class WsClient {
         })).catch(() => {
             this.logDebug(`Couldn't unsubscribe ${path}, ${method}`);
         });
+    }
+
+    sendPing() {
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            this.callRpcMethod('.broker/app', 'ping').catch((error: unknown) => {
+                console.log('Failed to send ping:', error);
+            });
+        }
     }
 
     accessGrantForMethodCall(path: string, method: string) {

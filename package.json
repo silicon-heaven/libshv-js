@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "3.3.5",
+  "version": "3.3.6",
   "description": "Typescript implementation of libshv",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
