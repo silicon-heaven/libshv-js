@@ -834,7 +834,7 @@ class CponWriter {
         this.increaseIndentIfNotOneLiner(map);
         this.doIndentIfNotOneliner(map);
         let first = true;
-        for (const [key, value] of Object.entries(map)) {
+        for (const [key, value] of Object.entries<RpcValue>(map)) {
             if (value === undefined) {
                 continue;
             }
