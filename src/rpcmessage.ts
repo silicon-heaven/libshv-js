@@ -1,19 +1,13 @@
-import {type IMap, type Int, isIMap, makeIMap, makeMetaMap, type MetaMap, type RpcValue, RpcValueWithMetaData} from './rpcvalue';
-import {toCpon} from './cpon';
-import {toChainPack} from './chainpack';
+import * as z from './zod';
 
-enum RpcMessageTag {
-    RequestId = 8,
-    ShvPath = 9,
-    Method = 10,
-    CallerIds = 11,
-}
+export const RPC_MESSAGE_REQUEST_ID = 8;
+export const RPC_MESSAGE_SHV_PATH = 9;
+export const RPC_MESSAGE_METHOD = 10;
+export const RPC_MESSAGE_CALLER_IDS = 11;
 
-enum RpcMessageKey {
-    Params = 1,
-    Result = 2,
-    Error = 3,
-}
+export const RPC_MESSAGE_PARAMS = 1;
+export const RPC_MESSAGE_RESULT = 2;
+export const RPC_MESSAGE_ERROR = 3;
 
 export const ERROR_CODE = 1;
 export const ERROR_MESSAGE = 2;
@@ -34,169 +28,52 @@ enum ErrorCode {
     NotImplemented = 12,
 }
 
-export type ErrorMap = {
-    [ERROR_CODE]: ErrorCode;
-    [ERROR_MESSAGE]?: string;
-    [ERROR_DATA]?: RpcValue;
-};
+const ErrorMapZod = z.imap({
+    [ERROR_CODE]: z.number(),
+    [ERROR_MESSAGE]: z.string().optional(),
+    [ERROR_DATA]: z.rpcvalue().optional(),
+});
 
-class RpcError extends Error {
-    constructor(private readonly err_info: ErrorMap) {
-        super(err_info[ERROR_MESSAGE] ?? 'Unknown RpcError');
-    }
+export type ErrorMap = z.infer<typeof ErrorMapZod>;
 
-    data() {
-        return this.err_info[ERROR_DATA];
-    }
-}
+const RpcRequestMetaZod = z.metamap({
+    [RPC_MESSAGE_REQUEST_ID]: z.number(),
+    [RPC_MESSAGE_METHOD]: z.string(),
+    [RPC_MESSAGE_SHV_PATH]: z.string(),
+});
 
-export class ProtocolError extends Error {}
+const RpcRequestValueZod = z.imap({
+    [RPC_MESSAGE_PARAMS]: z.rpcvalue().optional(),
+});
 
-export class InvalidRequest extends RpcError {}
-export class MethodNotFound extends RpcError {}
-export class InvalidParams extends RpcError {}
-export class InternalError extends RpcError {}
-export class ParseError extends RpcError {}
-export class MethodCallTimeout extends RpcError {}
-export class MethodCallCancelled extends RpcError {}
-export class MethodCallException extends RpcError {}
-export class Unknown extends RpcError {}
-export class LoginRequired extends RpcError {}
-export class UserIDRequired extends RpcError {}
-export class NotImplemented extends RpcError {}
+const RpcResponseMetaZod = z.metamap({
+    [RPC_MESSAGE_REQUEST_ID]: z.number(),
+});
+const RpcResponseValueZod = z.imap({
+    [RPC_MESSAGE_RESULT]: z.rpcvalue(),
+}).or(z.imap({
+    [RPC_MESSAGE_ERROR]: ErrorMapZod,
+}));
 
-class RpcMessage {
-    value: IMap;
-    meta: MetaMap;
-    constructor(rpc_val?: RpcValue) {
-        if (rpc_val === undefined) {
-            this.value = makeIMap({});
-            this.meta = makeMetaMap({});
-            return;
-        }
+const RpcSignalMetaZod = z.metamap({
+    [RPC_MESSAGE_SHV_PATH]: z.string(),
+    [RPC_MESSAGE_METHOD]: z.string(),
+});
+const RpcSignalValueZod = z.imap({
+    [RPC_MESSAGE_PARAMS]: z.rpcvalue().optional(),
+});
 
-        if (!(rpc_val instanceof RpcValueWithMetaData && isIMap(rpc_val.value))) {
-            throw new TypeError(`RpcMessage initialized with a non-IMap: ${toCpon(rpc_val)}`);
-        }
+const RpcRequestZod = z.withMeta(RpcRequestMetaZod, RpcRequestValueZod);
+const RpcResponseZod = z.withMeta(RpcResponseMetaZod, RpcResponseValueZod);
+const RpcSignalZod = z.withMeta(RpcSignalMetaZod, RpcSignalValueZod);
+const RpcMessageZod = z.union([RpcRequestZod, RpcResponseZod, RpcSignalZod]);
+export type RpcRequest = z.infer<typeof RpcRequestZod>;
+export type RpcResponse = z.infer<typeof RpcResponseZod>;
+export type RpcSignal = z.infer<typeof RpcSignalZod>;
+export type RpcMessage = z.infer<typeof RpcMessageZod>;
 
-        this.value = rpc_val.value;
-        this.meta = rpc_val.meta;
-    }
+export const isSignal = (message: RpcMessage): message is RpcSignal => !(RPC_MESSAGE_REQUEST_ID in message.meta) && RPC_MESSAGE_METHOD in message.meta;
+export const isRequest = (message: RpcMessage): message is RpcRequest => RPC_MESSAGE_REQUEST_ID in message.meta && RPC_MESSAGE_METHOD in message.meta;
+export const isResponse = (message: RpcMessage): message is RpcResponse => RPC_MESSAGE_REQUEST_ID in message.meta && !(RPC_MESSAGE_METHOD in message.meta);
 
-    isValid() {
-        return this.shvPath() && (this.isRequest() || this.isResponse || this.isSignal());
-    }
-
-    isRequest(): boolean {
-        return this.requestId() !== undefined && this.method() !== undefined;
-    }
-
-    isResponse(): boolean {
-        return this.requestId() !== undefined && this.method() === undefined;
-    }
-
-    isSignal(): boolean {
-        return this.requestId() === undefined && this.method() !== undefined;
-    }
-
-    requestId(): Int | undefined {
-        return (this.meta[RpcMessageTag.RequestId] as Int);
-    }
-
-    setRequestId(id: number) {
-        this.meta[RpcMessageTag.RequestId] = id;
-    }
-
-    callerIds(): RpcValue[] | undefined {
-        return this.meta[RpcMessageTag.CallerIds] as RpcValue[];
-    }
-
-    setCallerIds(ids: RpcValue[]) {
-        this.meta[RpcMessageTag.CallerIds] = ids;
-    }
-
-    shvPath(): string | undefined {
-        return (this.meta[RpcMessageTag.ShvPath] as string);
-    }
-
-    setShvPath(val: string) {
-        this.meta[RpcMessageTag.ShvPath] = val;
-    }
-
-    method(): string | undefined {
-        return (this.meta[RpcMessageTag.Method] as string);
-    }
-
-    setMethod(val: string) {
-        this.meta[RpcMessageTag.Method] = val;
-    }
-
-    params() {
-        return this.value[RpcMessageKey.Params] as RpcValue;
-    }
-
-    setParams(params: RpcValue) {
-        this.value[RpcMessageKey.Params] = params;
-    }
-
-    resultOrError() {
-        if (Object.hasOwn(this.value, RpcMessageKey.Error)) {
-            if (!isIMap(this.value[RpcMessageKey.Error])) {
-                return new ProtocolError('Response had an error, but this error was not a map');
-            }
-
-            const errorMap = this.value[RpcMessageKey.Error];
-            if (typeof errorMap[ERROR_CODE] !== 'number') {
-                return new ProtocolError('Response had an error, but this error did not contain at least an error code');
-            }
-
-            const code = errorMap[ERROR_CODE] as unknown;
-
-            const ErrorTypeCtor = (() => {
-                switch (code) {
-                    case ErrorCode.InvalidRequest: return InvalidRequest;
-                    case ErrorCode.MethodNotFound: return MethodNotFound;
-                    case ErrorCode.InvalidParams: return InvalidParams;
-                    case ErrorCode.InternalError: return InternalError;
-                    case ErrorCode.ParseError: return ParseError;
-                    case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
-                    case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
-                    case ErrorCode.MethodCallException: return MethodCallException;
-                    case ErrorCode.Unknown: return Unknown;
-                    case ErrorCode.LoginRequired: return LoginRequired;
-                    case ErrorCode.UserIDRequired: return UserIDRequired;
-                    case ErrorCode.NotImplemented: return NotImplemented;
-                    default: return Unknown;
-                }
-            })();
-
-            return new ErrorTypeCtor(this.value[RpcMessageKey.Error] as IMap<ErrorMap>);
-        }
-
-        if (Object.hasOwn(this.value, RpcMessageKey.Result)) {
-            return this.value[RpcMessageKey.Result] as RpcValue;
-        }
-
-        return new ProtocolError('Response included neither result nor error');
-    }
-
-    setResult(result: RpcValue) {
-        this.value[RpcMessageKey.Result] = result;
-    }
-
-    setError(error: string) {
-        this.value[RpcMessageKey.Error] = error;
-    }
-
-    toCpon() {
-        return toCpon(new RpcValueWithMetaData(this.value, this.meta));
-    }
-
-    toChainPack() {
-        return toChainPack(new RpcValueWithMetaData(this.value, this.meta));
-    }
-}
-
-export type RpcResponse<T = RpcValue> = T | Error;
-
-export {RpcMessage, RpcError, ErrorCode};
+export {RpcMessageZod, ErrorCode};

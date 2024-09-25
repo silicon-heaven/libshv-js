@@ -97,6 +97,8 @@ const isShvMap = (x: unknown): x is ShvMap => typeof x === 'object' && (x as Shv
 
 const isIMap = (x: unknown): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
 
+const isMetaMap = (x: unknown): x is IMap => typeof x === 'object' && (x as MetaMap)[shvMapType] === 'metamap';
+
 const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): MetaMap<U> => ({
     ...x,
     [shvMapType]: 'metamap',
@@ -112,10 +114,10 @@ const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>, 
     [shvMapType]: 'map',
 });
 
-class RpcValueWithMetaData {
-    constructor(public value: RpcValueType, public meta: MetaMap) {}
+class RpcValueWithMetaData<MetaSchema extends MetaMap = MetaMap, ValueSchema extends RpcValueType = RpcValueType> {
+    constructor(public meta: MetaSchema, public value: ValueSchema) {}
 }
 
 export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-export {shvMapType, Decimal, Double, type IMap, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isShvMap};
+export {shvMapType, Decimal, Double, type IMap, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isMetaMap, isShvMap};
