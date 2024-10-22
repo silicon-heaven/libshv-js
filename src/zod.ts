@@ -8,6 +8,9 @@ export const metamap = <T extends Record<string | number, ZodType<any, any, any>
 export const int = () => z.number();
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments -- Zod needs the default argument, otherwise it'll infer as UInt<unknown>
 export const uint = () => z.instanceof(UInt<number>);
+export const double = () => z.instanceof(Double);
+export const decimal = () => z.instanceof(Decimal);
+export const blob = () => z.instanceof(ArrayBuffer);
 
 const withMetaInstanceParser = z.instanceof(RpcValueWithMetaData);
 export const rpcvalue = () => z.union([
@@ -15,9 +18,9 @@ export const rpcvalue = () => z.union([
     z.boolean(),
     z.number(),
     uint(),
-    z.instanceof(Double),
-    z.instanceof(Decimal),
-    z.instanceof(ArrayBuffer),
+    double(),
+    decimal(),
+    blob(),
     z.string(),
     z.date(),
     z.array(z.any()),
