@@ -178,7 +178,7 @@ class ChainPackReader {
 
                 msec += SHV_EPOCH_MSEC;
                 msec -= offset * 60_000;
-                return withOffset(new Date(msec), offset);
+                return withOffset(new Date(msec), offset ?? undefined);
             }
 
             case PackingSchema.Map: {

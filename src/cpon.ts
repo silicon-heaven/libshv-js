@@ -315,7 +315,7 @@ class CponReader {
         // let epoch_sec = CponReader.timegm(year, month, mday, hour, min, sec);
         let epochMsec = Date.UTC(year, month - 1, day, hour, min, sec, msec);
         epochMsec -= utcOffset * 60_000;
-        return withOffset(new Date(epochMsec), utcOffset);
+        return withOffset(new Date(epochMsec), utcOffset ?? undefined);
     }
 
     readCString() {
