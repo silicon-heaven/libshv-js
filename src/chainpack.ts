@@ -559,14 +559,14 @@ class ChainPackWriter {
         }
 
         let bi = BigInt(msecs);
-        if (dt.utc_offset !== undefined) {
+        if (dt.utc_offset !== undefined && dt.utc_offset !== 0) {
             bi <<= 7n;
             bi |= BigInt((dt.utc_offset / 15) & 0x7F);
         }
 
         bi <<= 2n;
 
-        if (dt.utc_offset !== undefined) {
+        if (dt.utc_offset !== undefined && dt.utc_offset !== 0) {
             bi |= 1n;
         }
 
