@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "3.4.2",
+  "version": "3.5.0",
   "description": "Typescript implementation of libshv",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -21,6 +21,7 @@
     "./chainpack.ts": "./src/chainpack.ts",
     "./cpcontext.ts": "./src/cpcontext.ts",
     "./cpon.ts": "./src/cpon.ts",
+    "./json.ts": "./src/json.ts",
     "./rpcmessage.ts": "./src/rpcmessage.ts",
     "./rpcvalue.ts": "./src/rpcvalue.ts",
     "./ws-client.ts": "./src/ws-client.ts",

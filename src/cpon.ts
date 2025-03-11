@@ -2,7 +2,7 @@
 import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
-const stringifyDate = (dt: DateTime) => {
+export const stringifyDate = (dt: DateTime) => {
     const epochMsec = dt.getTime();
     let utcOffset = dt.utc_offset;
     const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));

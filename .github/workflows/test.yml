@@ -16,7 +16,7 @@ jobs:
     name: CPON/Chainpack conversions
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: npm install
@@ -25,4 +25,6 @@ jobs:
         run: npx tsc
 
       - name: Run tests
-        run: node test.js
+        run: |
+          node test.js
+          node test_json.js
