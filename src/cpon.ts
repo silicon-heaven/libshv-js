@@ -2,6 +2,33 @@
 import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
+const stringifyDate = (dt: DateTime) => {
+    const epochMsec = dt.getTime();
+    let utcOffset = dt.utc_offset;
+    const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));
+    let res = new Date(localMsec).toISOString();
+    const rtrim = (localMsec % 1000) ? 1 : 5;
+    res = res.slice(0, Math.max(0, res.length - rtrim));
+
+    if (utcOffset === undefined || utcOffset === 0) {
+        res += 'Z';
+    } else {
+        if (utcOffset < 0) {
+            res += '-';
+            utcOffset = -utcOffset;
+        } else {
+            res += '+';
+        }
+
+        res += (Math.trunc(utcOffset / 60)).toString().padStart(2, '0');
+        if (utcOffset % 60) {
+            res += (utcOffset % 60).toString().padStart(2, '0');
+        }
+    }
+
+    return res;
+};
+
 const hexify = (byte: number) => {
     if (byte < 10) {
         return 48 + byte;
@@ -775,36 +802,8 @@ class CponWriter {
     }
 
     writeDateTime(dt: DateTime) {
-        const epochMsec = dt.getTime();
-        let utcOffset = dt.utc_offset;
-        const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));
-        let s = new Date(localMsec).toISOString();
-        const rtrim = (localMsec % 1000) ? 1 : 5;
         this.ctx.writeStringUtf8('d"');
-        for (let i = 0; i < s.length - rtrim; i++) {
-            this.ctx.putByte(s.codePointAt(i)!);
-        }
-
-        if (utcOffset === undefined || utcOffset === 0) {
-            this.ctx.writeStringUtf8('Z');
-        } else {
-            if (utcOffset < 0) {
-                this.ctx.writeStringUtf8('-');
-                utcOffset = -utcOffset;
-            } else {
-                this.ctx.writeStringUtf8('+');
-            }
-
-            s = (Math.trunc(utcOffset / 60)).toString().padStart(2, '0');
-            if (utcOffset % 60) {
-                s += (utcOffset % 60).toString().padStart(2, '0');
-            }
-
-            for (let i = 0; i < s.length; i++) {
-                this.ctx.putByte(s.codePointAt(i)!);
-            }
-        }
-
+        this.ctx.writeStringUtf8(stringifyDate(dt));
         this.ctx.writeStringUtf8('"');
     }
 
