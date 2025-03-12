@@ -249,6 +249,25 @@ class CponReader {
     }
 
     readDateTime() {
+        this.ctx.getByte(); // eat '"'
+        let b = this.ctx.peekByte();
+        if (b === '"'.codePointAt(0)) {
+            // d"" invalid data time
+            this.ctx.getByte();
+            throw new TypeError('Malformed empty date separator in DateTime');
+        }
+
+        const date = this.readDateTimeInner();
+
+        b = this.ctx.getByte();
+        if (b !== '"'.codePointAt(0)) {
+            throw new TypeError('DateTime literal should be terminated by \'"\'.');
+        }
+
+        return date;
+    }
+
+    readDateTimeInner() {
         let year = 0;
         let month = 0;
         let day = 1;
@@ -258,17 +277,9 @@ class CponReader {
         let msec = 0;
         let utcOffset = 0;
 
-        this.ctx.getByte(); // eat '"'
-        let b = this.ctx.peekByte();
-        if (b === '"'.codePointAt(0)) {
-            // d"" invalid data time
-            this.ctx.getByte();
-            throw new TypeError('Malformed empty date separator in DateTime');
-        }
-
         year = Number(this.readInt());
 
-        b = this.ctx.getByte();
+        let b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
@@ -332,11 +343,6 @@ class CponReader {
             if (b === '-'.codePointAt(0)) {
                 utcOffset = -utcOffset;
             }
-        }
-
-        b = this.ctx.getByte();
-        if (b !== '"'.codePointAt(0)) {
-            throw new TypeError('DateTime literal should be terminated by \'"\'.');
         }
 
         // let epoch_sec = CponReader.timegm(year, month, mday, hour, min, sec);
