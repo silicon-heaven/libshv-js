@@ -775,11 +775,6 @@ class CponWriter {
     }
 
     writeDateTime(dt: DateTime) {
-        if (!dt) {
-            this.ctx.writeStringUtf8('d""');
-            return;
-        }
-
         const epochMsec = dt.getTime();
         let utcOffset = dt.utc_offset;
         const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));
