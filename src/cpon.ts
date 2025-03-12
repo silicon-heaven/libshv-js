@@ -835,10 +835,6 @@ class CponWriter {
         this.doIndentIfNotOneliner(map);
         let first = true;
         for (const [key, value] of Object.entries<RpcValue>(map)) {
-            if (value === undefined) {
-                continue;
-            }
-
             if (!first) {
                 this.ctx.putByte(','.codePointAt(0)!);
                 this.doIndentIfNotOneliner(map);
