@@ -11,9 +11,10 @@ export const uint = () => z.instanceof(UInt<number>);
 export const double = () => z.instanceof(Double);
 export const decimal = () => z.instanceof(Decimal);
 export const blob = () => z.instanceof(ArrayBuffer);
+export const list = () => z.array(z.lazy(rpcvalue));
 
 const withMetaInstanceParser = z.instanceof(RpcValueWithMetaData);
-export const rpcvalue = () => z.union([
+export const rpcvalue: () => ZodType<RpcValue, any, any> = () => z.union([
     z.undefined(),
     z.boolean(),
     z.number(),
@@ -23,7 +24,7 @@ export const rpcvalue = () => z.union([
     blob(),
     z.string(),
     z.date(),
-    z.array(z.any()),
+    list(),
     map(),
     imap(),
     withMetaInstanceParser,
