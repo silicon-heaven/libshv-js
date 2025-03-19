@@ -36,12 +36,19 @@ type Subscription = {
     callback: SubscriptionCallback;
 };
 
+type Login = {
+    type: 'PLAIN';
+    user: string;
+    password: string;
+} | {
+    type: 'AZURE';
+    token: string;
+};
+
 type WsClientOptions = {
     logDebug: (...args: string[]) => void;
     mountPoint?: string;
-    user?: string;
-    password: string;
-    loginType?: 'PLAIN' | 'AZURE';
+    login: Login;
     timeout?: number;
     pingInterval?: number;
     wsUri: string;
@@ -116,9 +123,7 @@ class WsClient {
 
     logDebug: WsClientOptions['logDebug'];
     mountPoint: WsClientOptions['mountPoint'];
-    user?: WsClientOptions['user'];
-    password: WsClientOptions['password'];
-    loginType: WsClientOptions['loginType'];
+    login: WsClientOptions['login'];
     onConnected: WsClientOptions['onConnected'];
     onConnectionFailure: WsClientOptions['onConnectionFailure'];
     onDisconnected: WsClientOptions['onDisconnected'];
@@ -134,9 +139,7 @@ class WsClient {
         this.logDebug = options.logDebug ?? (() => {/* nothing */});
         this.mountPoint = options.mountPoint;
 
-        this.user = options.user ?? '';
-        this.password = options.password;
-        this.loginType = options.loginType ?? 'PLAIN';
+        this.login = options.login;
 
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
@@ -162,12 +165,24 @@ class WsClient {
                     return;
                 }
 
+                const makeLoginMap = () => {
+                    switch (this.login.type) {
+                        case 'PLAIN':
+                            return makeMap({
+                                password: this.login.password,
+                                type: this.login.type,
+                                user: this.login.user,
+                            })
+                        case 'AZURE':
+                            return makeMap({
+                                password: this.login.token,
+                                type: this.login.type,
+                            })
+                    }
+                };
+
                 const params = makeMap({
-                    login: makeMap({
-                        password: this.password,
-                        type: this.loginType,
-                        user: this.user,
-                    }),
+                    login: makeLoginMap(),
                     options: makeMap({
                         device: this.mountPoint === 'string' ? makeMap({mountPoint: this.mountPoint}) : undefined,
                     }),
