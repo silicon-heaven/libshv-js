@@ -41,22 +41,32 @@ type Login = {
     user: string;
     password: string;
 } | {
-    type: 'AZURE';
+    type: 'TOKEN';
     token: string;
 };
 
-type WsClientOptions = {
+type WsClientOptionsCommon = {
     logDebug: (...args: string[]) => void;
+    wsUri: string;
+};
+
+type WsClientOptionsLogin = WsClientOptionsCommon & {
     mountPoint?: string;
     login: Login;
     timeout?: number;
     pingInterval?: number;
-    wsUri: string;
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
     onRequest: (rpc_msg: RpcRequest) => void;
 };
+
+type WsClientOptionsWorkflows = WsClientOptionsCommon & {
+    onWorkflows: (workflows: RpcValue) => void;
+    onWorkflowsFailed: () => void;
+};
+
+type WsClientOptions = WsClientOptionsLogin | WsClientOptionsWorkflows;
 
 type LsResult = string[];
 export enum DirFlags {
@@ -110,106 +120,30 @@ class UserIDRequired extends RpcError {}
 class NotImplemented extends RpcError {}
 
 class WsClient {
-    requestId = 1;
-    pingTimerId = -1;
+    private requestId = 1;
+    private pingTimerId = -1;
 
-    rpcHandlers: Array<{
+    private rpcHandlers: Array<{
         resolve: RpcResponseResolver;
         timeout_handle: number;
     }> = [];
 
-    subscriptions: Subscription[] = [];
-    websocket: WebSocket;
+    private readonly subscriptions: Subscription[] = [];
+    private readonly websocket: WebSocket;
 
-    logDebug: WsClientOptions['logDebug'];
-    mountPoint: WsClientOptions['mountPoint'];
-    login: WsClientOptions['login'];
-    onConnected: WsClientOptions['onConnected'];
-    onConnectionFailure: WsClientOptions['onConnectionFailure'];
-    onDisconnected: WsClientOptions['onDisconnected'];
-    onRequest: WsClientOptions['onRequest'];
-    timeout: WsClientOptions['timeout'];
-    pingInterval: WsClientOptions['pingInterval'];
+    private readonly options: WsClientOptions;
+    private readonly timeout: number;
 
     constructor(options: WsClientOptions) {
         if (typeof options !== 'object') {
             throw new TypeError('No options object supplied');
         }
 
-        this.logDebug = options.logDebug ?? (() => {/* nothing */});
-        this.mountPoint = options.mountPoint;
-
-        this.login = options.login;
+        this.options = options;
+        this.timeout = 'timeout' in options && options.timeout !== undefined ? options.timeout : DEFAULT_TIMEOUT;
 
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
-
-        this.pingInterval = options.pingInterval ?? DEFAULT_PING_INTERVAL;
-        this.onConnected = options.onConnected ?? (() => {/* nothing */});
-        this.onConnectionFailure = options.onConnectionFailure ?? (() => {/* nothing */});
-        this.onDisconnected = options.onDisconnected ?? (() => {/* nothing */});
-        this.onRequest = options.onRequest ?? (() => {/* nothing */});
-
-        this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
-
-        this.websocket.addEventListener('open', () => {
-            this.logDebug('CONNECTED');
-            const handleConnectionError = (error: Error) => {
-                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
-                this.onConnectionFailure(error);
-            };
-
-            this.callRpcMethod(undefined, 'hello').then(response => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                const makeLoginMap = () => {
-                    switch (this.login.type) {
-                        case 'PLAIN':
-                            return makeMap({
-                                password: this.login.password,
-                                type: this.login.type,
-                                user: this.login.user,
-                            })
-                        case 'AZURE':
-                            return makeMap({
-                                password: this.login.token,
-                                type: this.login.type,
-                            })
-                    }
-                };
-
-                const params = makeMap({
-                    login: makeLoginMap(),
-                    options: makeMap({
-                        device: this.mountPoint === 'string' ? makeMap({mountPoint: this.mountPoint}) : undefined,
-                    }),
-                });
-                return this.callRpcMethod(undefined, 'login', params);
-            }).then(response => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                this.logDebug('SUCCESS: connected to shv broker');
-                this.onConnected();
-                this.pingTimerId = window.setInterval(() => {
-                    this.sendPing();
-                }, this.pingInterval);
-            }).catch(() => {
-                this.logDebug('FAILURE: couldn\' connected to shv broker');
-            });
-        });
-
-        this.websocket.addEventListener('close', () => {
-            this.logDebug('DISCONNECTED');
-            this.subscriptions.length = 0;
-            this.onDisconnected();
-            window.clearInterval(this.pingTimerId);
-        });
 
         this.websocket.addEventListener('message', (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
@@ -226,7 +160,9 @@ class WsClient {
                     }
                 }
             } else if (isRequest(rpcMsg)) {
-                this.onRequest(rpcMsg);
+                if ('onRequest' in this.options) {
+                    this.options.onRequest(rpcMsg);
+                }
             } else if (isResponse(rpcMsg)) {
                 const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];
 
@@ -273,6 +209,12 @@ class WsClient {
             console.log('WebSocket ERROR', evt);
             this.logDebug('WebSocket ERROR');
         });
+
+        if ('onWorkflows' in this.options) {
+            this.workflowsProcedure(this.options);
+        } else {
+            this.loginProcedure(this.options);
+        }
     }
 
     callRpcMethod(shv_path: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<ResultOrError<string>>;
@@ -287,8 +229,7 @@ class WsClient {
             [RPC_MESSAGE_SHV_PATH]: shv_path ?? '',
         }), makeIMap({
             [RPC_MESSAGE_PARAMS]: params,
-        }),
-        );
+        }));
 
         this.sendRpcMessage(rq);
 
@@ -384,6 +325,110 @@ class WsClient {
 
     close() {
         this.websocket.close();
+    }
+
+    private logDebug(...args: string[]) {
+        if (this.options.logDebug === undefined) {
+            return;
+        }
+
+        this.options.logDebug(...args);
+    }
+
+    private workflowsProcedure(options: WsClientOptionsWorkflows) {
+        let workflowsObtained = false;
+        this.websocket.addEventListener('open', () => {
+            this.options.logDebug('CONNECTED');
+            const handleConnectionError = (error: Error) => {
+                this.logDebug('FAILURE: couldn\'t retrieve workflows', error.message);
+                options.onWorkflowsFailed();
+            };
+
+            this.callRpcMethod(undefined, 'workflows').then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                workflowsObtained = true;
+                options.onWorkflows(response);
+
+                this.close();
+            }).catch((_: unknown) => {
+                options.onWorkflowsFailed();
+            });
+        });
+
+        this.websocket.addEventListener('close', () => {
+            this.logDebug('DISCONNECTED');
+            if (!workflowsObtained) {
+                options.onWorkflowsFailed();
+            }
+        });
+    }
+
+    private loginProcedure(options: WsClientOptionsLogin) {
+        this.websocket.addEventListener('open', () => {
+            this.options.logDebug('CONNECTED');
+            const handleConnectionError = (error: Error) => {
+                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
+                options.onConnectionFailure(error);
+            };
+
+            const handleLoginResponse = (response: any) => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                this.logDebug('SUCCESS: connected to shv broker');
+                options.onConnected();
+                this.pingTimerId = window.setInterval(() => {
+                    this.sendPing();
+                }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
+            };
+
+            const makeLoginParams = (loginMap: ShvMap) => makeMap({
+                login: loginMap,
+                options: makeMap({
+                    device: options.mountPoint === 'string' ? makeMap({mountPoint: options.mountPoint}) : undefined,
+                }),
+            });
+
+            this.callRpcMethod(undefined, 'hello').then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                const makeLoginMap = () => {
+                    switch (options.login.type) {
+                        case 'PLAIN':
+                            return makeMap({
+                                password: options.login.password,
+                                type: options.login.type,
+                                user: options.login.user,
+                            });
+                        case 'TOKEN':
+                            return makeMap({
+                                token: options.login.token,
+                                type: options.login.type,
+                            });
+                    }
+                };
+
+                return this.callRpcMethod(undefined, 'login', makeLoginParams(makeLoginMap()));
+            }).then(handleLoginResponse).catch(() => {
+                this.logDebug('FAILURE: couldn\' connected to shv broker');
+            });
+        });
+
+        this.websocket.addEventListener('close', () => {
+            this.logDebug('DISCONNECTED');
+            this.subscriptions.length = 0;
+            options.onDisconnected();
+            window.clearInterval(this.pingTimerId);
+        });
     }
 }
 
