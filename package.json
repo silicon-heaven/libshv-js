@@ -1,6 +1,5 @@
 {
   "name": "libshv-js",
-  "type": "module",
   "version": "3.6.2",
   "description": "Typescript implementation of libshv",
   "scripts": {
