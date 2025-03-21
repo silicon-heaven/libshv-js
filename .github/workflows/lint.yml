@@ -14,9 +14,9 @@ on:
 jobs:
   type-check:
     name: Type check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install tsc
         run: npm install
       - name: Run tsc
@@ -24,9 +24,9 @@ jobs:
 
   xo:
     name: xo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install tsc
         run: npm install
       - name: Run linters
