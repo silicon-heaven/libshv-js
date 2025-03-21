@@ -14,9 +14,9 @@ on:
 jobs:
   check-version-bump:
     name: Check version bump
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check if version bumped
-        uses: del-systems/check-if-version-bumped@v2.0.3
+        uses: del-systems/check-if-version-bumped@v2
 
