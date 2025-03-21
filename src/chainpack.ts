@@ -85,7 +85,7 @@ const significantBitsCount = (num: bigint) => {
 class ChainPackReader {
     ctx: UnpackContext;
 
-    constructor(data: ArrayBuffer | Uint8Array | UnpackContext) {
+    constructor(data: ArrayBuffer | UnpackContext) {
         this.ctx = data instanceof UnpackContext ? data : new UnpackContext(data);
     }
 

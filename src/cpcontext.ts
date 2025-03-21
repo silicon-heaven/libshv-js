@@ -2,7 +2,7 @@ class UnpackContext {
     index: number;
     private readonly data: Uint8Array;
 
-    constructor(buf: ArrayBuffer) {
+    constructor(buf: ArrayBufferLike) {
         this.data = new Uint8Array(buf);
         this.index = 0;
     }
