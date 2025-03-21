@@ -7,7 +7,7 @@ export const stringifyDate = (dt: DateTime) => {
     let utcOffset = dt.utc_offset;
     const localMsec = epochMsec + (60_000 * (utcOffset ?? 0));
     let res = new Date(localMsec).toISOString();
-    const rtrim = (localMsec % 1000) ? 1 : 5;
+    const rtrim = ((localMsec % 1000) !== 0) ? 1 : 5;
     res = res.slice(0, Math.max(0, res.length - rtrim));
 
     if (utcOffset === undefined || utcOffset === 0) {
@@ -21,7 +21,7 @@ export const stringifyDate = (dt: DateTime) => {
         }
 
         res += (Math.trunc(utcOffset / 60)).toString().padStart(2, '0');
-        if (utcOffset % 60) {
+        if ((utcOffset % 60) !== 0) {
             res += (utcOffset % 60).toString().padStart(2, '0');
         }
     }
@@ -85,8 +85,9 @@ const utf8ToString = (bytearray: ArrayBuffer) => {
 
 class CponReader {
     ctx: UnpackContext;
-    constructor(unpack_context: UnpackContext) {
-        this.ctx = unpack_context;
+
+    constructor(unpackContext: UnpackContext) {
+        this.ctx = unpackContext;
     }
 
     read(): RpcValue {
@@ -188,7 +189,6 @@ class CponReader {
         const KEY_DELIM = ':'.codePointAt(0)!;
         const FIELD_DELIM = ','.codePointAt(0)!;
         /* eslint-disable max-depth */
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.peekByte();
             if (b < 1) {
@@ -202,7 +202,6 @@ class CponReader {
                         b = this.ctx.getByte();
                         if (b === STAR) {
                             // multiline_comment_entered;
-                            // eslint-disable-next-line no-constant-condition
                             while (true) {
                                 b = this.ctx.getByte();
                                 if (b === STAR) {
@@ -214,7 +213,6 @@ class CponReader {
                             }
                         } else if (b === SLASH) {
                             // to end of line comment entered;
-                            // eslint-disable-next-line no-constant-condition
                             while (true) {
                                 b = this.ctx.getByte();
                                 if (b === LF) {
@@ -354,7 +352,6 @@ class CponReader {
     readCString() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.getByte();
             if (b === '\\'.codePointAt(0)) {
@@ -402,7 +399,6 @@ class CponReader {
     readBlobEsc() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             let b = this.ctx.getByte();
             if (b === '\\'.codePointAt(0)) {
@@ -445,7 +441,6 @@ class CponReader {
     readBlobHex() {
         const pctx = new PackContext();
         this.ctx.getByte(); // eat '"'
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.getByte();
             if (b === '"'.codePointAt(0)) {
@@ -463,7 +458,6 @@ class CponReader {
     readList() {
         const lst = [];
         this.ctx.getByte(); // eat '['
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             this.skipWhitespace();
             const b = this.ctx.peekByte();
@@ -494,7 +488,7 @@ class CponReader {
     readInt() {
         let base = 10;
         let val = 0;
-        let neg = 0;
+        let neg = false;
         let n = 0;
         for (; ; n++) {
             const b = this.ctx.peekByte();
@@ -509,7 +503,7 @@ class CponReader {
 
                 this.ctx.getByte();
                 if (b === 45) {
-                    neg = 1;
+                    neg = true;
                 }
             } else if (b === 120) { // 'x'
                 if (n === 1 && val !== 0) {
@@ -575,7 +569,6 @@ class CponReader {
         mantisa = Number(this.readInt());
         b = this.ctx.peekByte();
         (() => {
-            // eslint-disable-next-line no-constant-condition
             while (true) {
                 switch (b) {
                     case 'u'.codePointAt(0): {
@@ -636,15 +629,14 @@ class CponReader {
         return isNeg ? -mantisa : mantisa;
     }
 
-    private implReadMap(map_type: 'map', terminator: number): ShvMap;
-    private implReadMap(map_type: 'imap', terminator: number): IMap;
-    private implReadMap(map_type: 'metamap', terminator: number): MetaMap;
-    private implReadMap(map_type: 'map' | 'imap' | 'metamap', terminator: number) {
+    private implReadMap(mapType: 'map', terminator: number): ShvMap;
+    private implReadMap(mapType: 'imap', terminator: number): IMap;
+    private implReadMap(mapType: 'metamap', terminator: number): MetaMap;
+    private implReadMap(mapType: 'map' | 'imap' | 'metamap', terminator: number) {
         const map: MetaMap | ShvMap | IMap = {
-            [shvMapType]: map_type,
+            [shvMapType]: mapType,
         };
         this.ctx.getByte(); // eat start
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             this.skipWhitespace();
             const b = this.ctx.peekByte();
@@ -681,60 +673,61 @@ class CponReader {
 class CponWriter {
     ctx: PackContext;
     nestLevel = 0;
+
     constructor(private readonly indentString?: string) {
         this.ctx = new PackContext();
     }
 
-    write(rpc_val: RpcValue) {
-        if (rpc_val instanceof RpcValueWithMetaData) {
-            this.writeMeta(rpc_val.meta);
-            rpc_val = rpc_val.value;
+    write(rpcVal: RpcValue) {
+        if (rpcVal instanceof RpcValueWithMetaData) {
+            this.writeMeta(rpcVal.meta);
+            rpcVal = rpcVal.value;
         }
 
         switch (true) {
-            case rpc_val === undefined:
+            case rpcVal === undefined:
                 this.ctx.writeStringUtf8('null');
                 break;
-            case typeof rpc_val === 'boolean':
-                this.writeBool(rpc_val);
+            case typeof rpcVal === 'boolean':
+                this.writeBool(rpcVal);
                 break;
-            case typeof rpc_val === 'string':
-                this.writeJSString(rpc_val);
+            case typeof rpcVal === 'string':
+                this.writeJSString(rpcVal);
                 break;
-            case rpc_val instanceof ArrayBuffer:
-                this.writeBlob(rpc_val);
+            case rpcVal instanceof ArrayBuffer:
+                this.writeBlob(rpcVal);
                 break;
-            case rpc_val instanceof UInt:
-                this.writeUInt(rpc_val);
+            case rpcVal instanceof UInt:
+                this.writeUInt(rpcVal);
                 break;
-            case typeof rpc_val === 'number':
-                this.writeInt(rpc_val);
+            case typeof rpcVal === 'number':
+                this.writeInt(rpcVal);
                 break;
-            case rpc_val instanceof Double:
-                this.writeDouble(rpc_val);
+            case rpcVal instanceof Double:
+                this.writeDouble(rpcVal);
                 break;
-            case rpc_val instanceof Decimal:
-                this.writeDecimal(rpc_val);
+            case rpcVal instanceof Decimal:
+                this.writeDecimal(rpcVal);
                 break;
-            case Array.isArray(rpc_val):
-                this.writeList(rpc_val);
+            case Array.isArray(rpcVal):
+                this.writeList(rpcVal);
                 break;
-            case rpc_val instanceof Date:
-                this.writeDateTime(rpc_val);
+            case rpcVal instanceof Date:
+                this.writeDateTime(rpcVal);
                 break;
-            case typeof rpc_val === 'object':
-                switch (rpc_val[shvMapType]) {
+            case typeof rpcVal === 'object':
+                switch (rpcVal[shvMapType]) {
                     case 'imap':
-                        this.writeIMap(rpc_val);
+                        this.writeIMap(rpcVal);
                         break;
                     case 'map':
-                        this.writeMap(rpc_val);
+                        this.writeMap(rpcVal);
                         break;
                 }
 
                 break;
             default:
-                console.log('Can\'t serialize rpc value', rpc_val);
+                console.log('Can\'t serialize rpc value', rpcVal);
                 throw new Error('Can\'t serialize rpc value');
         }
     }
@@ -745,25 +738,25 @@ class CponWriter {
             const charcode = str.codePointAt(i)!;
             switch (charcode) {
                 case 0:
-                    this.ctx.writeStringUtf8('\\0');
+                    this.ctx.writeStringUtf8(String.raw`\0`);
                     break;
                 case '\\'.codePointAt(0):
                     this.ctx.writeStringUtf8('\\\\');
                     break;
                 case '\t'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\t');
+                    this.ctx.writeStringUtf8(String.raw`\t`);
                     break;
                 case '\b'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\b');
+                    this.ctx.writeStringUtf8(String.raw`\b`);
                     break;
                 case '\r'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\r');
+                    this.ctx.writeStringUtf8(String.raw`\r`);
                     break;
                 case '\n'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\n');
+                    this.ctx.writeStringUtf8(String.raw`\n`);
                     break;
                 case '"'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\"');
+                    this.ctx.writeStringUtf8(String.raw`\"`);
                     break;
                 default:
                     this.ctx.writeCharCodeUtf8(charcode);
@@ -782,16 +775,16 @@ class CponWriter {
                     this.ctx.writeStringUtf8('\\\\');
                     break;
                 case '\t'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\t');
+                    this.ctx.writeStringUtf8(String.raw`\t`);
                     break;
                 case '\r'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\r');
+                    this.ctx.writeStringUtf8(String.raw`\r`);
                     break;
                 case '\n'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\n');
+                    this.ctx.writeStringUtf8(String.raw`\n`);
                     break;
                 case '"'.codePointAt(0):
-                    this.ctx.writeStringUtf8('\\"');
+                    this.ctx.writeStringUtf8(String.raw`\"`);
                     break;
                 default:
                     if (b >= 32 && b < 127) {
@@ -910,8 +903,8 @@ class CponWriter {
     }
 
     writeDecimal(val: Decimal) {
-        let mantisa = val.mantisa;
-        const exponent = val.exponent;
+        let {mantisa} = val;
+        const {exponent} = val;
         if (mantisa < 0) {
             mantisa = -mantisa;
             this.ctx.putByte('-'.codePointAt(0)!);

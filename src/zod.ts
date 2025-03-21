@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {z, type ZodType} from 'zod';
 import {Decimal, Double, type IMap, isIMap, isMetaMap, isShvMap, type MetaMap, type RpcValue, type RpcValueType, RpcValueWithMetaData, type ShvMap, UInt} from './rpcvalue';
 
@@ -6,7 +7,7 @@ export const recmap = <T extends ZodType<any, any, any>>(schema: T) => z.custom<
 export const imap = <T extends Record<string, ZodType<any, any, any>>>(schema?: T) => z.custom<IMap<{[K in keyof T]: z.infer<T[K]>}>>((data: RpcValue) => isIMap(data) && (schema === undefined || z.object(schema).safeParse(data).success));
 export const metamap = <T extends Record<string | number, ZodType<any, any, any>>>(schema?: T) => z.custom<MetaMap<{[K in keyof T]: z.infer<T[K]>}>>((data: RpcValue) => isMetaMap(data) && (schema === undefined || z.object(schema).safeParse(data).success));
 export const int = () => z.number();
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments -- Zod needs the default argument, otherwise it'll infer as UInt<unknown>
+
 export const uint = () => z.instanceof(UInt<number>);
 export const double = () => z.instanceof(Double);
 export const decimal = () => z.instanceof(Decimal);

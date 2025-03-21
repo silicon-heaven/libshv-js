@@ -14,7 +14,7 @@ class UInt<T extends number = number> {
         this.value = u;
     }
 
-    [Symbol.toPrimitive](_hint: string) {
+    [Symbol.toPrimitive]() {
         return this.value;
     }
 
@@ -34,6 +34,7 @@ class Double {
 class Decimal {
     mantisa: number;
     exponent: number;
+
     constructor(mantisa: number, exponent: number) {
         if (!Number.isInteger(exponent)) {
             throw new TypeError(`Decimal: exponent must be integral (${exponent})`);
@@ -49,9 +50,9 @@ export type Bool = boolean;
 export type Blob = ArrayBuffer;
 export type ShvString = string;
 export type DateTime = Date & {utc_offset?: number};
-const withOffset = (date: Date, utc_offset?: number) => {
-    const clonedDate: DateTime = new Date(date.getTime());
-    clonedDate.utc_offset = utc_offset;
+const withOffset = (date: Date, utcOffset?: number) => {
+    const clonedDate: DateTime = new Date(date);
+    clonedDate.utc_offset = utcOffset;
     return clonedDate;
 };
 
@@ -59,12 +60,14 @@ export type List = RpcValue[];
 
 const shvMapType = Symbol('shvMapType');
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- I can't get rid of this yet
 type IMap<T extends Record<number, RpcValue> = Record<number, any>> = {
     [Key in keyof T]: T[Key];
 } & {
     [shvMapType]: 'imap';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- I can't get rid of this yet
 type ShvMap<T extends Record<string, RpcValue> = Record<string, any>> = {
     [Key in keyof T]: T[Key];
 } & {

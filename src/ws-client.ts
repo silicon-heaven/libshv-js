@@ -122,15 +122,12 @@ class NotImplemented extends RpcError {}
 class WsClient {
     private requestId = 1;
     private pingTimerId = -1;
-
     private rpcHandlers: Array<{
         resolve: RpcResponseResolver;
         timeout_handle: number;
     }> = [];
-
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
-
     private readonly options: WsClientOptions;
     private readonly timeout: number;
 
@@ -172,6 +169,7 @@ class WsClient {
                     handler.resolve((() => {
                         if (RPC_MESSAGE_ERROR in rpcMsg.value) {
                             const code = rpcMsg.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
+                            // eslint-disable-next-line @typescript-eslint/naming-convention
                             const ErrorTypeCtor = (() => {
                                 switch (code) {
                                     case ErrorCode.InvalidRequest: return InvalidRequest;
@@ -199,7 +197,7 @@ class WsClient {
 
                         return new ProtocolError('Response included neither result nor error');
                     })());
-                    // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
+                    // eslint-disable-next-line @typescript-eslint/no-array-delete
                     delete this.rpcHandlers[Number(requestId)];
                 }
             }
@@ -217,16 +215,16 @@ class WsClient {
         }
     }
 
-    callRpcMethod(shv_path: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<ResultOrError<string>>;
-    callRpcMethod(shv_path: string | undefined, method: 'dir', params?: RpcValue): Promise<ResultOrError<DirResult>>;
-    callRpcMethod(shv_path: string | undefined, method: 'ls', params?: RpcValue): Promise<ResultOrError<LsResult>>;
-    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError>;
-    callRpcMethod(shv_path: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError> {
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<ResultOrError<string>>;
+    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue): Promise<ResultOrError<DirResult>>;
+    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue): Promise<ResultOrError<LsResult>>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError> {
         const rqId = this.requestId++;
         const rq: RpcRequest = new RpcValueWithMetaData(makeMetaMap({
             [RPC_MESSAGE_REQUEST_ID]: rqId,
             [RPC_MESSAGE_METHOD]: method ?? '',
-            [RPC_MESSAGE_SHV_PATH]: shv_path ?? '',
+            [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
         }), makeIMap({
             [RPC_MESSAGE_PARAMS]: params,
         }));
@@ -234,7 +232,7 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new Promise<ResultOrError>(resolve => {
-            this.rpcHandlers[rqId] = {resolve, timeout_handle: self.setTimeout(() => {
+            this.rpcHandlers[rqId] = {resolve, timeout_handle: globalThis.setTimeout(() => {
                 resolve(new MethodCallTimeout(makeIMap({
                     [ERROR_CODE]: ErrorCode.MethodCallTimeout,
                     [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
@@ -246,10 +244,10 @@ class WsClient {
         return promise;
     }
 
-    sendRpcMessage(rpc_msg: RpcMessage) {
-        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            this.logDebug('sending rpc message:', toCpon(rpc_msg));
-            const msgData = new Uint8Array(toChainPack(rpc_msg));
+    sendRpcMessage(rpcMsg: RpcMessage) {
+        if (this.websocket.readyState === WebSocket.OPEN) {
+            this.logDebug('sending rpc message:', toCpon(rpcMsg));
+            const msgData = new Uint8Array(toChainPack(rpcMsg));
 
             const wr = new ChainPackWriter();
             wr.writeUIntData(msgData.length + 1);
@@ -354,7 +352,7 @@ class WsClient {
                 options.onWorkflows(response);
 
                 this.close();
-            }).catch((_: unknown) => {
+            }).catch(() => {
                 options.onWorkflowsFailed();
             });
         });
@@ -375,7 +373,7 @@ class WsClient {
                 options.onConnectionFailure(error);
             };
 
-            const handleLoginResponse = (response: any) => {
+            const handleLoginResponse = (response: unknown) => {
                 if (response instanceof Error) {
                     handleConnectionError(response);
                     return;
@@ -383,7 +381,7 @@ class WsClient {
 
                 this.logDebug('SUCCESS: connected to shv broker');
                 options.onConnected();
-                this.pingTimerId = window.setInterval(() => {
+                this.pingTimerId = globalThis.setInterval(() => {
                     this.sendPing();
                 }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
             };
@@ -427,7 +425,7 @@ class WsClient {
             this.logDebug('DISCONNECTED');
             this.subscriptions.length = 0;
             options.onDisconnected();
-            window.clearInterval(this.pingTimerId);
+            globalThis.clearInterval(this.pingTimerId);
         });
     }
 }

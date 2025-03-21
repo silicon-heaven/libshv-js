@@ -155,9 +155,9 @@ class ChainPackReader {
                 bi >>= 2n;
 
                 let offset = 0;
-                if (hasTzOffset) {
+                if (hasTzOffset !== 0n) {
                     offset = Number(bi & 0x7Fn);
-                    if (offset & 0x40) {
+                    if ((offset & 0x40) !== 0) {
                         // sign extension
                         offset -= 128;
                     }
@@ -172,7 +172,7 @@ class ChainPackReader {
                 }
 
                 let msec = Number(bi);
-                if (hasNotMsec) {
+                if (hasNotMsec !== 0n) {
                     msec *= 1000;
                 }
 
@@ -216,7 +216,6 @@ class ChainPackReader {
             case PackingSchema.CString: {
                 // variation of CponReader.readCString()
                 const pctx = new PackContext();
-                // eslint-disable-next-line no-constant-condition
                 while (true) {
                     let b = this.ctx.getByte();
                     if (b === '\\'.codePointAt(0)) {
@@ -317,7 +316,6 @@ class ChainPackReader {
 
     readList() {
         const lst = [];
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.peekByte();
             if (b as PackingSchema === PackingSchema.Term) {
@@ -343,14 +341,13 @@ class ChainPackReader {
         return this.implReadMap('imap');
     }
 
-    private implReadMap(map_type: 'map'): ShvMap;
-    private implReadMap(map_type: 'imap'): IMap;
-    private implReadMap(map_type: 'metamap'): MetaMap;
-    private implReadMap(map_type: 'map' | 'imap' | 'metamap') {
+    private implReadMap(mapType: 'map'): ShvMap;
+    private implReadMap(mapType: 'imap'): IMap;
+    private implReadMap(mapType: 'metamap'): MetaMap;
+    private implReadMap(mapType: 'map' | 'imap' | 'metamap') {
         const map: ShvMap | IMap | MetaMap = {
-            [shvMapType]: map_type,
+            [shvMapType]: mapType,
         };
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             const b = this.ctx.peekByte();
             if (b as PackingSchema === PackingSchema.Term) {
@@ -384,55 +381,55 @@ class ChainPackWriter {
         this.ctx = new PackContext();
     }
 
-    write(rpc_val: RpcValue) {
-        if (rpc_val instanceof RpcValueWithMetaData) {
-            this.writeMeta(rpc_val.meta);
-            rpc_val = rpc_val.value;
+    write(rpcVal: RpcValue) {
+        if (rpcVal instanceof RpcValueWithMetaData) {
+            this.writeMeta(rpcVal.meta);
+            rpcVal = rpcVal.value;
         }
 
         switch (true) {
-            case rpc_val === undefined:
+            case rpcVal === undefined:
                 this.ctx.putByte(PackingSchema.Null);
                 break;
-            case typeof rpc_val === 'boolean':
-                this.ctx.putByte(rpc_val ? PackingSchema.True : PackingSchema.False);
+            case typeof rpcVal === 'boolean':
+                this.ctx.putByte(rpcVal ? PackingSchema.True : PackingSchema.False);
                 break;
-            case typeof rpc_val === 'string':
-                this.writeJSString(rpc_val);
+            case typeof rpcVal === 'string':
+                this.writeJSString(rpcVal);
                 break;
-            case rpc_val instanceof ArrayBuffer:
-                this.writeBlob(rpc_val);
+            case rpcVal instanceof ArrayBuffer:
+                this.writeBlob(rpcVal);
                 break;
-            case rpc_val instanceof UInt:
-                this.writeUInt(rpc_val);
+            case rpcVal instanceof UInt:
+                this.writeUInt(rpcVal);
                 break;
-            case typeof rpc_val === 'number':
-                this.writeInt(rpc_val);
+            case typeof rpcVal === 'number':
+                this.writeInt(rpcVal);
                 break;
-            case rpc_val instanceof Decimal:
-                this.writeDecimal(rpc_val);
+            case rpcVal instanceof Decimal:
+                this.writeDecimal(rpcVal);
                 break;
-            case Array.isArray(rpc_val):
-                this.writeList(rpc_val);
+            case Array.isArray(rpcVal):
+                this.writeList(rpcVal);
                 break;
-            case rpc_val instanceof Date:
-                this.writeDateTime(rpc_val);
+            case rpcVal instanceof Date:
+                this.writeDateTime(rpcVal);
                 break;
-            case rpc_val instanceof Double:
+            case rpcVal instanceof Double:
                 throw new Error('writing doubles not implemented');
-            case typeof rpc_val === 'object':
-                switch (rpc_val[shvMapType]) {
+            case typeof rpcVal === 'object':
+                switch (rpcVal[shvMapType]) {
                     case 'imap':
-                        this.writeIMap(rpc_val);
+                        this.writeIMap(rpcVal);
                         break;
                     case 'map':
-                        this.writeMap(rpc_val);
+                        this.writeMap(rpcVal);
                         break;
                 }
 
                 break;
             default:
-                console.log('Can\'t serialize', rpc_val);
+                console.log('Can\'t serialize', rpcVal);
                 throw new Error('Can\'t serialize');
         }
     }
