@@ -81,6 +81,7 @@ export default tseslint.config(
             "no-dupe-class-members": "off",
             "no-negated-condition": "off",
             "no-unused-vars": "off",
+            "no-useless-constructor": "off",
             "no-void": ["error", {
                 allowAsStatement: true
             }],
@@ -90,6 +91,9 @@ export default tseslint.config(
             "unicorn/explicit-length-check": "off",
             "unicorn/filename-case": "off",
             "unicorn/no-negated-condition": "off",
+            "unicorn/no-useless-undefined": ["error", {
+                checkArguments: false
+            }],
             "unicorn/prefer-top-level-await": "off",
             "unicorn/switch-case-braces": "off",
             "unicorn/prevent-abbreviations": "off",

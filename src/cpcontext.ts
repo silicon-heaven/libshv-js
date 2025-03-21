@@ -45,7 +45,6 @@ const transfer = (source: ArrayBuffer, length: number) => {
 
 class PackContext {
     static CHUNK_LEN = 1024;
-
     data = new Uint8Array(0);
     length = 0;
 
