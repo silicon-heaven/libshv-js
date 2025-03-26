@@ -263,7 +263,6 @@ class WsClient {
                 dgram[ix++] = msgDatum;
             }
 
-            this.logDebug(`sending ${dgram.length} bytes of data`);
             this.websocket.send(dgram.buffer);
         }
     }
