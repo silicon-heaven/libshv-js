@@ -104,8 +104,6 @@ class RpcError extends Error {
     }
 }
 
-class ProtocolError extends Error {}
-
 class InvalidRequest extends RpcError {}
 class MethodNotFound extends RpcError {}
 class InvalidParams extends RpcError {}
@@ -195,7 +193,8 @@ class WsClient {
                             return rpcMsg.value[RPC_MESSAGE_RESULT];
                         }
 
-                        return new ProtocolError('Response included neither result nor error');
+                        // If both result and error are missing, the result is implicitly Null.
+                        // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
                     })());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete
                     delete this.rpcHandlers[Number(requestId)];
