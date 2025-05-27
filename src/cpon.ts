@@ -674,7 +674,7 @@ class CponWriter {
     ctx: PackContext;
     nestLevel = 0;
 
-    constructor(private readonly indentString?: string) {
+    constructor(private readonly indentString?: string, private oneLiners: OneLiners = OneLiners.Yes) {
         this.ctx = new PackContext();
     }
 
@@ -949,6 +949,10 @@ class CponWriter {
     }
 
     private isOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (this.oneLiners === OneLiners.No) {
+            return false;
+        }
+
         const keyThreshold = Array.isArray(value) ? 10 : 5;
 
         if (Array.isArray(value)) {
@@ -971,8 +975,13 @@ class CponWriter {
     }
 }
 
-const toCpon = (value: RpcValue, indentString?: string) => {
-    const wr = new CponWriter(indentString);
+export enum OneLiners {
+    Yes,
+    No,
+}
+
+const toCpon = (value: RpcValue, indentString?: string, oneLiners: OneLiners = OneLiners.Yes) => {
+    const wr = new CponWriter(indentString, oneLiners);
     wr.write(value);
     return new TextDecoder().decode(wr.ctx.buffer());
 };
