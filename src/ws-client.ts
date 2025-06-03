@@ -1,6 +1,6 @@
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -58,7 +58,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (rpc_msg: RpcRequest) => void;
+    onRequest: (shvPath: string, method: string, param?: RpcValue) => Promise<RpcValue>;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -95,7 +95,7 @@ type DirResult = Array<IMap<{
 }>>;
 
 class RpcError extends Error {
-    constructor(private readonly err_info: ErrorMap) {
+    constructor(readonly err_info: ErrorMap) {
         super(err_info[ERROR_MESSAGE] ?? 'Unknown RpcError');
     }
 
@@ -104,18 +104,38 @@ class RpcError extends Error {
     }
 }
 
-class InvalidRequest extends RpcError {}
-class MethodNotFound extends RpcError {}
-class InvalidParams extends RpcError {}
-class InternalError extends RpcError {}
-class ParseError extends RpcError {}
-class MethodCallTimeout extends RpcError {}
-class MethodCallCancelled extends RpcError {}
-class MethodCallException extends RpcError {}
-class Unknown extends RpcError {}
-class LoginRequired extends RpcError {}
-class UserIDRequired extends RpcError {}
-class NotImplemented extends RpcError {}
+const makeErrInfo = (errInfoOrMsg: ErrorMap | string, code: ErrorCode) => {
+    if (typeof errInfoOrMsg === 'object') {
+        return errInfoOrMsg;
+    }
+
+    return makeIMap({
+        [ERROR_CODE]: code,
+        [ERROR_MESSAGE]: errInfoOrMsg,
+        [ERROR_DATA]: undefined,
+    });
+};
+
+const createErrorClass = (code: ErrorCode) => class extends RpcError {
+    constructor(errInfoOrMsg: ErrorMap | string) {
+        super(makeErrInfo(errInfoOrMsg, code));
+    }
+};
+
+/* eslint-disable @typescript-eslint/naming-convention */
+export const InvalidRequest = createErrorClass(ErrorCode.InvalidRequest);
+export const MethodNotFound = createErrorClass(ErrorCode.MethodNotFound);
+export const InvalidParams = createErrorClass(ErrorCode.InvalidParams);
+export const InternalError = createErrorClass(ErrorCode.InternalError);
+export const ParseError = createErrorClass(ErrorCode.ParseError);
+export const MethodCallTimeout = createErrorClass(ErrorCode.MethodCallTimeout);
+export const MethodCallCancelled = createErrorClass(ErrorCode.MethodCallCancelled);
+export const MethodCallException = createErrorClass(ErrorCode.MethodCallException);
+export const Unknown = createErrorClass(ErrorCode.Unknown);
+export const LoginRequired = createErrorClass(ErrorCode.LoginRequired);
+export const UserIDRequired = createErrorClass(ErrorCode.UserIDRequired);
+export const NotImplemented = createErrorClass(ErrorCode.NotImplemented);
+/* eslint-enable @typescript-eslint/naming-convention */
 
 class WsClient {
     private requestId = 1;
@@ -140,7 +160,7 @@ class WsClient {
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
 
-        this.websocket.addEventListener('message', (evt: MessageEvent<ArrayBuffer>) => {
+        this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
             const rpcMsg = RpcMessageZod.parse(rpcVal);
             this.logDebug(`message received: ${toCpon(rpcMsg)}`);
@@ -156,7 +176,37 @@ class WsClient {
                 }
             } else if (isRequest(rpcMsg)) {
                 if ('onRequest' in this.options) {
-                    this.options.onRequest(rpcMsg);
+                    const respond = (value: RpcResponseValue) => {
+                        this.sendRpcMessage(new RpcValueWithMetaData(
+                            makeMetaMap({
+                                [RPC_MESSAGE_CALLER_IDS]: rpcMsg.meta[RPC_MESSAGE_CALLER_IDS],
+                                [RPC_MESSAGE_REQUEST_ID]: rpcMsg.meta[RPC_MESSAGE_REQUEST_ID],
+                            }),
+                            value,
+                        ));
+                    };
+
+                    try {
+                        respond(makeIMap({
+                            [RPC_MESSAGE_RESULT]: await this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS]),
+                        }));
+                    } catch (error: unknown) {
+                        const sendError = (error: RpcError) => {
+                            respond(error.err_info);
+                        };
+
+                        switch (true) {
+                            case error instanceof RpcError:
+                                sendError(error);
+                                break;
+                            case error instanceof Error:
+                                sendError(new InternalError(error.message));
+                                break;
+                            default:
+                                sendError(new InternalError('Unknown error'));
+                                break;
+                        }
+                    }
                 }
             } else if (isResponse(rpcMsg)) {
                 const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];

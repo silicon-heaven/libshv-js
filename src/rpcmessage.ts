@@ -71,6 +71,7 @@ const RpcSignalZod = z.withMeta(RpcSignalMetaZod, RpcSignalValueZod);
 const RpcMessageZod = z.union([RpcRequestZod, RpcResponseZod, RpcSignalZod]);
 export type RpcRequest = z.infer<typeof RpcRequestZod>;
 export type RpcResponse = z.infer<typeof RpcResponseZod>;
+export type RpcResponseValue = z.infer<typeof RpcResponseValueZod>;
 export type RpcSignal = z.infer<typeof RpcSignalZod>;
 export type RpcMessage = z.infer<typeof RpcMessageZod>;
 
