@@ -387,7 +387,7 @@ class WsClient {
             const makeLoginParams = (loginMap: ShvMap) => makeMap({
                 login: loginMap,
                 options: makeMap({
-                    device: options.mountPoint === 'string' ? makeMap({mountPoint: options.mountPoint}) : undefined,
+                    device: typeof options.mountPoint === 'string' ? makeMap({mountPoint: options.mountPoint}) : undefined,
                 }),
             });
 
