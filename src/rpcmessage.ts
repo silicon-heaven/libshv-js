@@ -37,6 +37,7 @@ const ErrorMapZod = z.imap({
 export type ErrorMap = z.infer<typeof ErrorMapZod>;
 
 const RpcRequestMetaZod = z.metamap({
+    [RPC_MESSAGE_CALLER_IDS]: z.int().or(z.array(z.int())).optional(),
     [RPC_MESSAGE_REQUEST_ID]: z.number(),
     [RPC_MESSAGE_METHOD]: z.string(),
     [RPC_MESSAGE_SHV_PATH]: z.string(),
@@ -47,6 +48,7 @@ const RpcRequestValueZod = z.imap({
 });
 
 const RpcResponseMetaZod = z.metamap({
+    [RPC_MESSAGE_CALLER_IDS]: z.int().or(z.array(z.int())).optional(),
     [RPC_MESSAGE_REQUEST_ID]: z.number(),
 });
 const RpcResponseValueZod = z.imap({

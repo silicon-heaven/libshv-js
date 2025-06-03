@@ -1,6 +1,6 @@
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -221,6 +221,7 @@ class WsClient {
     callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError> {
         const rqId = this.requestId++;
         const rq: RpcRequest = new RpcValueWithMetaData(makeMetaMap({
+            [RPC_MESSAGE_CALLER_IDS]: undefined,
             [RPC_MESSAGE_REQUEST_ID]: rqId,
             [RPC_MESSAGE_METHOD]: method ?? '',
             [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
