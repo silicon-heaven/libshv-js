@@ -416,7 +416,8 @@ class ChainPackWriter {
                 this.writeDateTime(rpcVal);
                 break;
             case rpcVal instanceof Double:
-                throw new Error('writing doubles not implemented');
+                this.writeDouble(rpcVal);
+                break;
             case typeof rpcVal === 'object':
                 switch (rpcVal[shvMapType]) {
                     case 'imap':
@@ -573,6 +574,19 @@ class ChainPackWriter {
 
         // save as signed int
         this.writeUIntDataHelper(bi, 'UInt');
+    }
+
+    writeDouble(double: Double) {
+        this.ctx.putByte(PackingSchema.Double);
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+
+        view.setFloat64(0, double.value, true);
+
+        const data = new Uint8Array(buffer);
+        for (let i = 0; i < 8; i++) {
+            this.ctx.putByte(data[i]);
+        }
     }
 
     writeList(lst: RpcValue[]) {
