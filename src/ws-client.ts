@@ -1,7 +1,7 @@
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue} from './rpcmessage';
-import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap} from './rpcvalue';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY} from './rpcmessage';
+import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
@@ -58,7 +58,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (shvPath: string, method: string, param?: RpcValue) => Promise<RpcValue>;
+    onRequest: (shvPath: string, method: string, param: RpcValue, delay: (progress: number) => void) => Promise<RpcValue>;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -187,8 +187,14 @@ class WsClient {
                     };
 
                     try {
+                        const sendDelay = (progress: number) => {
+                            respond(makeIMap({
+                                [RPC_MESSAGE_DELAY]: new Double(progress),
+                            }));
+                        };
+
                         respond(makeIMap({
-                            [RPC_MESSAGE_RESULT]: await this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS]),
+                            [RPC_MESSAGE_RESULT]: await this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay),
                         }));
                     } catch (error: unknown) {
                         const sendError = (error: RpcError) => {
