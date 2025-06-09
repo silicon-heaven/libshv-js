@@ -139,10 +139,10 @@ export const NotImplemented = createErrorClass(ErrorCode.NotImplemented);
 
 class WsClient {
     private requestId = 1;
-    private pingTimerId = -1;
+    private pingTimerId: ReturnType<typeof globalThis.setInterval> | undefined = undefined;
     private rpcHandlers: Array<{
         resolve: RpcResponseResolver;
-        timeout_handle: number;
+        timeout_handle: ReturnType<typeof globalThis.setTimeout>;
     }> = [];
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
