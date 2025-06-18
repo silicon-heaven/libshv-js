@@ -199,7 +199,9 @@ class WsClient {
                         }));
                     } catch (error: unknown) {
                         const sendError = (error: RpcError) => {
-                            respond(error.err_info);
+                            respond(makeIMap({
+                                [RPC_MESSAGE_ERROR]: error.err_info
+                            }));
                         };
 
                         switch (true) {
