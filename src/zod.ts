@@ -1,21 +1,44 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {z, type ZodType} from 'zod';
-import {Decimal, Double, type IMap, isIMap, isMetaMap, isShvMap, type MetaMap, type RpcValue, type RpcValueType, RpcValueWithMetaData, type ShvMap, UInt} from './rpcvalue';
+import {z, type ZodType} from 'zod/v4';
+import {Decimal, Double, isIMap, isMetaMap, isShvMap, type MetaMap, RpcValue, type RpcValueType, RpcValueWithMetaData, shvMapType, typeName, UInt} from './rpcvalue';
 
-export const map = <T extends Record<string, ZodType<any, any, any>>>(schema?: T) => z.custom<ShvMap<{[K in keyof T]: z.infer<T[K]>}>>((data: RpcValue) => isShvMap(data) && (schema === undefined || z.object(schema).safeParse(data).success));
-export const recmap = <T extends ZodType<any, any, any>>(schema: T) => z.custom<ShvMap<Record<string, z.infer<T>>>>((data: RpcValue) => isShvMap(data) && z.record(z.string(), schema).safeParse(data).success);
-export const imap = <T extends Record<string, ZodType<any, any, any>>>(schema?: T) => z.custom<IMap<{[K in keyof T]: z.infer<T[K]>}>>((data: RpcValue) => isIMap(data) && (schema === undefined || z.object(schema).safeParse(data).success));
-export const metamap = <T extends Record<string | number, ZodType<any, any, any>>>(schema?: T) => z.custom<MetaMap<{[K in keyof T]: z.infer<T[K]>}>>((data: RpcValue) => isMetaMap(data) && (schema === undefined || z.object(schema).safeParse(data).success));
+const implMakeMapParser = <MapBrand extends string, ObjectParser extends ZodType<object>>(mapValidator: (val: unknown) => boolean, _mapBrand: MapBrand, mapName: string, objectParser: ObjectParser) => z.custom<z.infer<ObjectParser> & {[shvMapType]: MapBrand}>().check(ctx => {
+    if (!mapValidator(ctx.value)) {
+        ctx.issues.push({
+            expected: 'map',
+            code: 'invalid_type',
+            input: ctx.value,
+            message: `Invalid input: expected ${mapName}, received ${typeName(ctx.value)}`,
+        });
+        return;
+    }
+
+    // For record, Zod finds out map brand, and calls the record's value parser with the value. There's no way to detect
+    // it, because Zod does not supply the parser with the key. To prevent this, remove the key before passing the value
+    // to Zod. This unfortunately means that we need to copy the whole object. :/
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {[shvMapType]: zodMustNotHaveThis, ...rest} = {...ctx.value};
+    const parsedObject = objectParser.safeParse(rest);
+
+    if (!parsedObject.success) {
+        ctx.issues = parsedObject.error.issues;
+    }
+});
+
+export const map = <T extends Record<string, ZodType<any>>>(schema: T) => implMakeMapParser(isShvMap, 'map', 'ShvMap', z.object(schema));
+export const imap = <T extends Record<number, ZodType<any>>>(schema: T) => implMakeMapParser(isIMap, 'imap', 'IMap', z.object(schema));
+export const metamap = <T extends Record<string | number, ZodType<any>>>(schema: T) => implMakeMapParser(isMetaMap, 'metamap', 'MetaMap', z.object(schema));
+export const recmap = <T extends ZodType<any>>(schema: T) => implMakeMapParser(val => isShvMap(val) || isIMap(val), 'map', 'ShvMap', z.record(z.any(), schema));
 export const int = () => z.number();
 
 export const uint = () => z.instanceof(UInt<number>);
 export const double = () => z.instanceof(Double);
 export const decimal = () => z.instanceof(Decimal);
 export const blob = () => z.instanceof(ArrayBuffer);
-export const list = () => z.array(z.lazy(rpcvalue));
+export const list: () => z.ZodArray<z.ZodLazy<z.ZodType<RpcValue>>> = () => z.array(z.lazy<z.ZodType<RpcValue>>(rpcvalue));
 
 const withMetaInstanceParser = z.instanceof(RpcValueWithMetaData);
-export const rpcvalue: () => ZodType<RpcValue, any, any> = () => z.union([
+export const rpcvalue: () => ZodType<RpcValue> = () => z.lazy(() => z.union([
     z.undefined(),
     z.boolean(),
     z.number(),
@@ -26,15 +49,48 @@ export const rpcvalue: () => ZodType<RpcValue, any, any> = () => z.union([
     z.string(),
     z.date(),
     list(),
-    map(),
-    imap(),
+    recmap(rpcvalue()),
     withMetaInstanceParser,
-]);
+]) as z.ZodType<RpcValue>);
 
-export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValueType>(metaParser: ZodType<MetaSchema, any, any>, valueParser: ZodType<ValueSchema, any, any>) =>
-    z.custom<RpcValueWithMetaData<z.infer<typeof metaParser>, z.infer<typeof valueParser>>>((data: any) => withMetaInstanceParser.and(z.object({
-        meta: metaParser,
-        value: valueParser,
-    })).safeParse(data).success);
+export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValueType>(metaParser: ZodType<MetaSchema>, valueParser: ZodType<ValueSchema>) =>
+    z.custom<RpcValueWithMetaData<z.infer<typeof metaParser>, z.infer<typeof valueParser>>>().check(ctx => {
+        if (!withMetaInstanceParser.safeParse(ctx.value).success) {
+            ctx.issues.push({
+                expected: 'map',
+                code: 'invalid_type',
+                input: ctx.value,
+                message: 'Invalid input: expected a value with metadata, got a value with no metadata}',
+            });
+            return;
+        }
 
-export * from 'zod';
+        const parsedMeta = metaParser.safeParse(ctx.value.meta);
+        if (!parsedMeta.success) {
+            ctx.issues = [
+                {
+                    expected: 'map',
+                    code: 'invalid_type',
+                    input: ctx.value,
+                    message: 'Wrong RpcValueWithMetaData meta',
+                },
+                ...parsedMeta.error.issues,
+            ];
+            return;
+        }
+
+        const parsedValue = valueParser.safeParse(ctx.value.value);
+        if (!parsedValue.success) {
+            ctx.issues = [
+                {
+                    expected: 'map',
+                    code: 'invalid_type',
+                    input: ctx.value,
+                    message: 'Wrong RpcValueWithMetaData value',
+                },
+                ...parsedValue.error.issues,
+            ];
+        }
+    });
+
+export * from 'zod/v4';
