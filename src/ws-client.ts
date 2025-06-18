@@ -162,6 +162,7 @@ class WsClient {
 
         this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
+
             const rpcMsg = RpcMessageZod.parse(rpcVal);
             this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
@@ -200,7 +201,7 @@ class WsClient {
                     } catch (error: unknown) {
                         const sendError = (error: RpcError) => {
                             respond(makeIMap({
-                                [RPC_MESSAGE_ERROR]: error.err_info
+                                [RPC_MESSAGE_ERROR]: error.err_info,
                             }));
                         };
 

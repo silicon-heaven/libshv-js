@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "3.10.0",
+  "version": "3.11.0",
   "description": "Typescript implementation of libshv",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -28,7 +28,7 @@
     "./zod.ts": "./src/zod.ts"
   },
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8.27.0",

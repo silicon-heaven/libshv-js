@@ -28,3 +28,4 @@ jobs:
         run: |
           node test.js
           node test_json.js
+          node test_zod.js

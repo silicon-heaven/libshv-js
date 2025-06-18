@@ -102,6 +102,25 @@ const isIMap = (x: unknown): x is IMap => typeof x === 'object' && (x as IMap)[s
 
 const isMetaMap = (x: unknown): x is IMap => typeof x === 'object' && (x as MetaMap)[shvMapType] === 'metamap';
 
+export const typeName = (x: unknown): string => {
+    switch (true) {
+        case x === undefined: return 'Null';
+        case typeof x === 'boolean': return 'Bool';
+        case typeof x === 'string': return 'String';
+        case x instanceof ArrayBuffer: return 'Blob';
+        case x instanceof UInt: return 'UInt';
+        case typeof x === 'number': return 'Int';
+        case x instanceof Double: return 'Double';
+        case x instanceof Decimal: return 'Decimal';
+        case Array.isArray(x): return 'List';
+        case x instanceof Date: return 'Date';
+        case isShvMap(x): return 'ShvMap';
+        case isIMap(x): return 'IMap';
+        case isMetaMap(x): return 'MetaMap';
+        default: return '<unknown type>';
+    }
+};
+
 const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): MetaMap<U> => ({
     ...x,
     [shvMapType]: 'metamap',
