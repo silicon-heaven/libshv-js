@@ -58,7 +58,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (shvPath: string, method: string, param: RpcValue, delay: (progress: number) => void) => Promise<RpcValue>;
+    onRequest: (shvPath: string, method: string, param: RpcValue, delay: (progress: number) => void) => RpcValue | Promise<RpcValue>;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -193,8 +193,9 @@ class WsClient {
                             }));
                         };
 
+                        const result = this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay);
                         respond(makeIMap({
-                            [RPC_MESSAGE_RESULT]: await this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay),
+                            [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
                         }));
                     } catch (error: unknown) {
                         const sendError = (error: RpcError) => {
