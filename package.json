@@ -31,12 +31,12 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.27.0",
-    "eslint": "^9.22.0",
-    "eslint-config-xo": "^0.46.0",
+    "@typescript-eslint/parser": "^8.35.0",
+    "eslint": "^9.29.0",
+    "eslint-config-xo": "^0.47.0",
     "eslint-formatter-unix": "^8.40.0",
-    "eslint-plugin-unicorn": "^57.0.0",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.27.0"
+    "eslint-plugin-unicorn": "^59.0.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.35.0"
   }
 }
