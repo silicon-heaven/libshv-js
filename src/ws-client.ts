@@ -1,6 +1,6 @@
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -50,6 +50,16 @@ type WsClientOptionsCommon = {
     wsUri: string;
 };
 
+export class RequestHandler {
+    constructor(public options: {
+        result: Promise<RpcValue>;
+        onAbort?: () => void;
+        onProgressQuery?: () => number | Promise<number>;
+    }) {
+        /* nothing */
+    }
+}
+
 type WsClientOptionsLogin = WsClientOptionsCommon & {
     mountPoint?: string;
     login: Login;
@@ -58,7 +68,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (shvPath: string, method: string, param: RpcValue, delay: (progress: number) => void) => RpcValue | Promise<RpcValue>;
+    onRequest: (shvPath: string, method: string, param: RpcValue, delay: (progress: number) => void) => RpcValue | Promise<RpcValue> | RequestHandler;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -144,6 +154,13 @@ const makeTimeout = (ms: number, resolve: RpcResponseResolver) => globalThis.set
         [ERROR_DATA]: undefined,
     })));
 }, ms);
+
+class RpcRequestPromise<Result> extends Promise<Result> {
+    constructor(executor: (resolve: (value: Result | PromiseLike<Result>) => void, reject: (reason?: unknown) => void) => void, public readonly abort: () => void, public readonly progressQuery: () => void) {
+        super(executor);
+    }
+}
+
 class WsClient {
     private requestId = 1;
     private pingTimerId: ReturnType<typeof globalThis.setInterval> | undefined = undefined;
@@ -152,6 +169,8 @@ class WsClient {
         delayCallback?: (progress: number) => void;
         timeout_handle: ReturnType<typeof globalThis.setTimeout>;
     }> = [];
+    private requestHandlers: RequestHandler[] = [];
+    private abortedRequests = new Set<number>();
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
     private readonly options: WsClientOptions;
@@ -185,27 +204,59 @@ class WsClient {
                 }
             } else if (isRequest(rpcMsg)) {
                 if ('onRequest' in this.options) {
+                    const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];
                     const respond = (value: RpcResponseValue) => {
                         this.sendRpcMessage(new RpcValueWithMetaData(
                             makeMetaMap({
                                 [RPC_MESSAGE_CALLER_IDS]: rpcMsg.meta[RPC_MESSAGE_CALLER_IDS],
-                                [RPC_MESSAGE_REQUEST_ID]: rpcMsg.meta[RPC_MESSAGE_REQUEST_ID],
+                                [RPC_MESSAGE_REQUEST_ID]: requestId,
                             }),
                             value,
                         ));
                     };
 
-                    try {
-                        const sendDelay = (progress: number) => {
-                            respond(makeIMap({
-                                [RPC_MESSAGE_DELAY]: new Double(progress),
-                            }));
-                        };
-
-                        const result = this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay);
+                    const sendDelay = (progress: number) => {
                         respond(makeIMap({
-                            [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                            [RPC_MESSAGE_DELAY]: new Double(progress),
                         }));
+                    };
+
+                    if (RPC_MESSAGE_ABORT in rpcMsg.value) {
+                        const requestHandler = this.requestHandlers[requestId];
+
+                        if (rpcMsg.value[RPC_MESSAGE_ABORT] === true && requestHandler?.options.onAbort !== undefined) {
+                            this.abortedRequests.add(requestId);
+                            requestHandler.options.onAbort();
+                        }
+
+                        if (rpcMsg.value[RPC_MESSAGE_ABORT] === false && requestHandler?.options.onProgressQuery !== undefined) {
+                            const progress = requestHandler.options.onProgressQuery();
+                            sendDelay(progress instanceof Promise ? await progress : progress);
+                        }
+
+                        return;
+                    }
+
+                    try {
+                        let result = this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay);
+                        if (result instanceof RequestHandler) {
+                            this.requestHandlers[requestId] = result;
+                            result = result.options.result;
+                        }
+
+                        const resultOrError = makeIMap({
+                            [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                        });
+
+                        if (!this.abortedRequests.has(requestId)) {
+                            respond(resultOrError);
+                        } else {
+                            this.abortedRequests.delete(requestId);
+                        }
+
+                        if (requestId in this.requestHandlers) {
+                            delete this.requestHandlers[requestId];
+                        }
                     } catch (error: unknown) {
                         const sendError = (error: RpcError) => {
                             respond(makeIMap({
@@ -298,25 +349,34 @@ class WsClient {
         }
     }
 
-    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): Promise<ResultOrError<string>>;
-    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError<DirResult>>;
-    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError<LsResult>>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void ): Promise<ResultOrError>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError> {
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<string>>;
+    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<DirResult>>;
+    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<LsResult>>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError> {
         const rqId = this.requestId++;
-        const rq: RpcRequest = new RpcValueWithMetaData(makeMetaMap({
+        const makeRq = (value: IMap) => new RpcValueWithMetaData(makeMetaMap({
             [RPC_MESSAGE_CALLER_IDS]: undefined,
             [RPC_MESSAGE_REQUEST_ID]: rqId,
             [RPC_MESSAGE_METHOD]: method ?? '',
             [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
-        }), makeIMap({
+        }), value);
+        const rq: RpcRequest = makeRq(makeIMap({
             [RPC_MESSAGE_PARAMS]: params,
         }));
 
         this.sendRpcMessage(rq);
 
-        const promise = new Promise<ResultOrError>(resolve => {
+        const promise = new RpcRequestPromise<ResultOrError>(resolve => {
             this.rpcHandlers[rqId] = {resolve, timeout_handle: makeTimeout(this.timeout, resolve), delayCallback};
+        }, () => {
+            this.sendRpcMessage(makeRq(makeIMap({
+                [RPC_MESSAGE_ABORT]: true,
+            })));
+        }, () => {
+            this.sendRpcMessage(makeRq(makeIMap({
+                [RPC_MESSAGE_ABORT]: false,
+            })));
         });
 
         return promise;
