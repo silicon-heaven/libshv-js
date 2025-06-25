@@ -271,8 +271,14 @@ class WsClient {
                             return rpcMsg.value[RPC_MESSAGE_RESULT];
                         }
 
-                        // If both result and error are missing, the result is implicitly Null.
+                        // At this point, the RpcResponse either has:
+                        // - no keys, which means that the response has an implicit Null result.
+                        // - has some unknown keys, in which case we will produce an error for the client.
                         // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
+                        const rpcMessageKeys = Object.keys(rpcMsg.value);
+                        if (rpcMessageKeys.length !== 0) {
+                            return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
+                        }
                     })());
                     // eslint-disable-next-line @typescript-eslint/no-array-delete
                     delete this.rpcHandlers[Number(requestId)];
