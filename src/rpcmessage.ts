@@ -9,6 +9,7 @@ export const RPC_MESSAGE_PARAMS = 1;
 export const RPC_MESSAGE_RESULT = 2;
 export const RPC_MESSAGE_ERROR = 3;
 export const RPC_MESSAGE_DELAY = 4;
+export const RPC_MESSAGE_ABORT = 5;
 
 export const ERROR_CODE = 1;
 export const ERROR_MESSAGE = 2;
@@ -46,7 +47,9 @@ const RpcRequestMetaZod = z.metamap({
 
 const RpcRequestValueZod = z.imap({
     [RPC_MESSAGE_PARAMS]: z.rpcvalue().optional(),
-});
+}).or(z.imap({
+    [RPC_MESSAGE_ABORT]: z.boolean(),
+}));
 
 const RpcResponseMetaZod = z.metamap({
     [RPC_MESSAGE_CALLER_IDS]: z.int().or(z.array(z.int())).optional(),
