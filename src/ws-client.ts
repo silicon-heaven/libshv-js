@@ -1,6 +1,6 @@
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -187,6 +187,154 @@ class WsClient {
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
 
+        const handleSignal = (signal: RpcSignal) => {
+            for (const sub of this.subscriptions) {
+                const shvPath = signal.meta[RPC_MESSAGE_SHV_PATH];
+                const method = signal.meta[RPC_MESSAGE_METHOD];
+
+                if (shvPath.startsWith(sub.path) && method === sub.method) {
+                    sub.callback(shvPath, method, signal.value[RPC_MESSAGE_PARAMS]);
+                }
+            }
+        };
+
+        const handleRequest = async (request: RpcRequest) => {
+            if ('onRequest' in this.options) {
+                const requestId = request.meta[RPC_MESSAGE_REQUEST_ID];
+                const respond = (value: RpcResponseValue) => {
+                    this.sendRpcMessage(new RpcValueWithMetaData(
+                        makeMetaMap({
+                            [RPC_MESSAGE_CALLER_IDS]: request.meta[RPC_MESSAGE_CALLER_IDS],
+                            [RPC_MESSAGE_REQUEST_ID]: requestId,
+                        }),
+                        value,
+                    ));
+                };
+
+                const sendDelay = (progress: number) => {
+                    respond(makeIMap({
+                        [RPC_MESSAGE_DELAY]: new Double(progress),
+                    }));
+                };
+
+                if (RPC_MESSAGE_ABORT in request.value) {
+                    const requestHandler = this.requestHandlers[requestId];
+
+                    if (request.value[RPC_MESSAGE_ABORT] === true && requestHandler?.options.onAbort !== undefined) {
+                        this.abortedRequests.add(requestId);
+                        requestHandler.options.onAbort();
+                    }
+
+                    if (request.value[RPC_MESSAGE_ABORT] === false && requestHandler?.options.onProgressQuery !== undefined) {
+                        const progress = requestHandler.options.onProgressQuery();
+                        sendDelay(progress instanceof Promise ? await progress : progress);
+                    }
+
+                    return;
+                }
+
+                try {
+                    let result = this.options.onRequest(request.meta[RPC_MESSAGE_SHV_PATH], request.meta[RPC_MESSAGE_METHOD], request.value[RPC_MESSAGE_PARAMS], sendDelay);
+                    if (result instanceof RequestHandler) {
+                        this.requestHandlers[requestId] = result;
+                        result = result.options.result;
+                    }
+
+                    const resultOrError = makeIMap({
+                        [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                    });
+
+                    if (!this.abortedRequests.has(requestId)) {
+                        respond(resultOrError);
+                    } else {
+                        this.abortedRequests.delete(requestId);
+                    }
+
+                    if (requestId in this.requestHandlers) {
+                        // eslint-disable-next-line @typescript-eslint/no-array-delete
+                        delete this.requestHandlers[requestId];
+                    }
+                } catch (error: unknown) {
+                    const sendError = (error: RpcError) => {
+                        respond(makeIMap({
+                            [RPC_MESSAGE_ERROR]: error.err_info,
+                        }));
+                    };
+
+                    switch (true) {
+                        case error instanceof RpcError:
+                            sendError(error);
+                            break;
+                        case error instanceof Error:
+                            sendError(new InternalError(error.message));
+                            break;
+                        default:
+                            sendError(new InternalError('Unknown error'));
+                            break;
+                    }
+                }
+            }
+        };
+
+        const handleResponse = (response: RpcResponse) => {
+            const requestId = response.meta[RPC_MESSAGE_REQUEST_ID];
+
+            if (this.rpcHandlers[Number(requestId)] !== undefined) {
+                const handler = this.rpcHandlers[Number(requestId)];
+                clearTimeout(handler.timeout_handle);
+
+                if (RPC_MESSAGE_DELAY in response.value) {
+                    if (handler.delayCallback !== undefined) {
+                        handler.delayCallback(response.value[RPC_MESSAGE_DELAY].value);
+                    }
+
+                    handler.timeout_handle = makeTimeout(this.timeout, handler.resolve);
+                    return;
+                }
+
+                handler.resolve((() => {
+                    if (RPC_MESSAGE_ERROR in response.value) {
+                        const code = response.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
+                        // eslint-disable-next-line @typescript-eslint/naming-convention
+                        const ErrorTypeCtor = (() => {
+                            switch (code) {
+                                case ErrorCode.InvalidRequest: return InvalidRequest;
+                                case ErrorCode.MethodNotFound: return MethodNotFound;
+                                case ErrorCode.InvalidParams: return InvalidParams;
+                                case ErrorCode.InternalError: return InternalError;
+                                case ErrorCode.ParseError: return ParseError;
+                                case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
+                                case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
+                                case ErrorCode.MethodCallException: return MethodCallException;
+                                case ErrorCode.Unknown: return Unknown;
+                                case ErrorCode.LoginRequired: return LoginRequired;
+                                case ErrorCode.UserIDRequired: return UserIDRequired;
+                                case ErrorCode.NotImplemented: return NotImplemented;
+                                default: return Unknown;
+                            }
+                        })();
+
+                        return new ErrorTypeCtor(response.value[RPC_MESSAGE_ERROR]);
+                    }
+
+                    if (RPC_MESSAGE_RESULT in response.value) {
+                        return response.value[RPC_MESSAGE_RESULT];
+                    }
+
+                    // At this point, the RpcResponse either has:
+                    // - no keys, which means that the response has an implicit Null result.
+                    // - has some unknown keys, in which case we will produce an error for the client.
+                    // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
+                    const rpcMessageKeys = Object.keys(response.value);
+                    if (rpcMessageKeys.length !== 0) {
+                        return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
+                    }
+                })());
+                // eslint-disable-next-line @typescript-eslint/no-array-delete
+                delete this.rpcHandlers[Number(requestId)];
+            }
+        };
+
         this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
 
@@ -194,146 +342,11 @@ class WsClient {
             this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
             if (isSignal(rpcMsg)) {
-                for (const sub of this.subscriptions) {
-                    const shvPath = rpcMsg.meta[RPC_MESSAGE_SHV_PATH];
-                    const method = rpcMsg.meta[RPC_MESSAGE_METHOD];
-
-                    if (shvPath.startsWith(sub.path) && method === sub.method) {
-                        sub.callback(shvPath, method, rpcMsg.value[RPC_MESSAGE_PARAMS]);
-                    }
-                }
+                handleSignal(rpcMsg);
             } else if (isRequest(rpcMsg)) {
-                if ('onRequest' in this.options) {
-                    const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];
-                    const respond = (value: RpcResponseValue) => {
-                        this.sendRpcMessage(new RpcValueWithMetaData(
-                            makeMetaMap({
-                                [RPC_MESSAGE_CALLER_IDS]: rpcMsg.meta[RPC_MESSAGE_CALLER_IDS],
-                                [RPC_MESSAGE_REQUEST_ID]: requestId,
-                            }),
-                            value,
-                        ));
-                    };
-
-                    const sendDelay = (progress: number) => {
-                        respond(makeIMap({
-                            [RPC_MESSAGE_DELAY]: new Double(progress),
-                        }));
-                    };
-
-                    if (RPC_MESSAGE_ABORT in rpcMsg.value) {
-                        const requestHandler = this.requestHandlers[requestId];
-
-                        if (rpcMsg.value[RPC_MESSAGE_ABORT] === true && requestHandler?.options.onAbort !== undefined) {
-                            this.abortedRequests.add(requestId);
-                            requestHandler.options.onAbort();
-                        }
-
-                        if (rpcMsg.value[RPC_MESSAGE_ABORT] === false && requestHandler?.options.onProgressQuery !== undefined) {
-                            const progress = requestHandler.options.onProgressQuery();
-                            sendDelay(progress instanceof Promise ? await progress : progress);
-                        }
-
-                        return;
-                    }
-
-                    try {
-                        let result = this.options.onRequest(rpcMsg.meta[RPC_MESSAGE_SHV_PATH], rpcMsg.meta[RPC_MESSAGE_METHOD], rpcMsg.value[RPC_MESSAGE_PARAMS], sendDelay);
-                        if (result instanceof RequestHandler) {
-                            this.requestHandlers[requestId] = result;
-                            result = result.options.result;
-                        }
-
-                        const resultOrError = makeIMap({
-                            [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
-                        });
-
-                        if (!this.abortedRequests.has(requestId)) {
-                            respond(resultOrError);
-                        } else {
-                            this.abortedRequests.delete(requestId);
-                        }
-
-                        if (requestId in this.requestHandlers) {
-                            delete this.requestHandlers[requestId];
-                        }
-                    } catch (error: unknown) {
-                        const sendError = (error: RpcError) => {
-                            respond(makeIMap({
-                                [RPC_MESSAGE_ERROR]: error.err_info,
-                            }));
-                        };
-
-                        switch (true) {
-                            case error instanceof RpcError:
-                                sendError(error);
-                                break;
-                            case error instanceof Error:
-                                sendError(new InternalError(error.message));
-                                break;
-                            default:
-                                sendError(new InternalError('Unknown error'));
-                                break;
-                        }
-                    }
-                }
+                await handleRequest(rpcMsg);
             } else if (isResponse(rpcMsg)) {
-                const requestId = rpcMsg.meta[RPC_MESSAGE_REQUEST_ID];
-
-                if (this.rpcHandlers[Number(requestId)] !== undefined) {
-                    const handler = this.rpcHandlers[Number(requestId)];
-                    clearTimeout(handler.timeout_handle);
-
-                    if (RPC_MESSAGE_DELAY in rpcMsg.value) {
-                        if (handler.delayCallback !== undefined) {
-                            handler.delayCallback(rpcMsg.value[RPC_MESSAGE_DELAY].value);
-                        }
-
-                        handler.timeout_handle = makeTimeout(this.timeout, handler.resolve);
-                        return;
-                    }
-
-                    handler.resolve((() => {
-                        if (RPC_MESSAGE_ERROR in rpcMsg.value) {
-                            const code = rpcMsg.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
-                            // eslint-disable-next-line @typescript-eslint/naming-convention
-                            const ErrorTypeCtor = (() => {
-                                switch (code) {
-                                    case ErrorCode.InvalidRequest: return InvalidRequest;
-                                    case ErrorCode.MethodNotFound: return MethodNotFound;
-                                    case ErrorCode.InvalidParams: return InvalidParams;
-                                    case ErrorCode.InternalError: return InternalError;
-                                    case ErrorCode.ParseError: return ParseError;
-                                    case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
-                                    case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
-                                    case ErrorCode.MethodCallException: return MethodCallException;
-                                    case ErrorCode.Unknown: return Unknown;
-                                    case ErrorCode.LoginRequired: return LoginRequired;
-                                    case ErrorCode.UserIDRequired: return UserIDRequired;
-                                    case ErrorCode.NotImplemented: return NotImplemented;
-                                    default: return Unknown;
-                                }
-                            })();
-
-                            return new ErrorTypeCtor(rpcMsg.value[RPC_MESSAGE_ERROR]);
-                        }
-
-                        if (RPC_MESSAGE_RESULT in rpcMsg.value) {
-                            return rpcMsg.value[RPC_MESSAGE_RESULT];
-                        }
-
-                        // At this point, the RpcResponse either has:
-                        // - no keys, which means that the response has an implicit Null result.
-                        // - has some unknown keys, in which case we will produce an error for the client.
-                        // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
-                        const rpcMessageKeys = Object.keys(rpcMsg.value);
-                        if (rpcMessageKeys.length !== 0) {
-                            return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
-                        }
-                    })());
-                    // eslint-disable-next-line @typescript-eslint/no-array-delete
-                    delete this.rpcHandlers[Number(requestId)];
-                }
+                handleResponse(rpcMsg);
             }
         });
 
