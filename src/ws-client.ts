@@ -137,11 +137,19 @@ export const UserIDRequired = createErrorClass(ErrorCode.UserIDRequired);
 export const NotImplemented = createErrorClass(ErrorCode.NotImplemented);
 /* eslint-enable @typescript-eslint/naming-convention */
 
+const makeTimeout = (ms: number, resolve: RpcResponseResolver) => globalThis.setTimeout(() => {
+    resolve(new MethodCallTimeout(makeIMap({
+        [ERROR_CODE]: ErrorCode.MethodCallTimeout,
+        [ERROR_MESSAGE]: `Shv call timeout after: ${ms} msec.`,
+        [ERROR_DATA]: undefined,
+    })));
+}, ms);
 class WsClient {
     private requestId = 1;
     private pingTimerId: ReturnType<typeof globalThis.setInterval> | undefined = undefined;
     private rpcHandlers: Array<{
         resolve: RpcResponseResolver;
+        delayCallback?: (progress: number) => void;
         timeout_handle: ReturnType<typeof globalThis.setTimeout>;
     }> = [];
     private readonly subscriptions: Subscription[] = [];
@@ -224,6 +232,16 @@ class WsClient {
                 if (this.rpcHandlers[Number(requestId)] !== undefined) {
                     const handler = this.rpcHandlers[Number(requestId)];
                     clearTimeout(handler.timeout_handle);
+
+                    if (RPC_MESSAGE_DELAY in rpcMsg.value) {
+                        if (handler.delayCallback !== undefined) {
+                            handler.delayCallback(rpcMsg.value[RPC_MESSAGE_DELAY].value);
+                        }
+
+                        handler.timeout_handle = makeTimeout(this.timeout, handler.resolve);
+                        return;
+                    }
+
                     handler.resolve((() => {
                         if (RPC_MESSAGE_ERROR in rpcMsg.value) {
                             const code = rpcMsg.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
@@ -274,11 +292,11 @@ class WsClient {
         }
     }
 
-    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string]): Promise<ResultOrError<string>>;
-    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue): Promise<ResultOrError<DirResult>>;
-    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue): Promise<ResultOrError<LsResult>>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue): Promise<ResultOrError> {
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): Promise<ResultOrError<string>>;
+    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError<DirResult>>;
+    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError<LsResult>>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void ): Promise<ResultOrError>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): Promise<ResultOrError> {
         const rqId = this.requestId++;
         const rq: RpcRequest = new RpcValueWithMetaData(makeMetaMap({
             [RPC_MESSAGE_CALLER_IDS]: undefined,
@@ -292,13 +310,7 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new Promise<ResultOrError>(resolve => {
-            this.rpcHandlers[rqId] = {resolve, timeout_handle: globalThis.setTimeout(() => {
-                resolve(new MethodCallTimeout(makeIMap({
-                    [ERROR_CODE]: ErrorCode.MethodCallTimeout,
-                    [ERROR_MESSAGE]: `Shv call timeout after: ${this.timeout} msec.`,
-                    [ERROR_DATA]: undefined,
-                })));
-            }, this.timeout)};
+            this.rpcHandlers[rqId] = {resolve, timeout_handle: makeTimeout(this.timeout, resolve), delayCallback};
         });
 
         return promise;
