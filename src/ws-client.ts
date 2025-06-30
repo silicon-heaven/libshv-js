@@ -106,7 +106,25 @@ type DirResult = Array<IMap<{
 
 class RpcError extends Error {
     constructor(readonly err_info: ErrorMap) {
-        super(err_info[ERROR_MESSAGE] ?? 'Unknown RpcError');
+        const errorCodeToMessage = (code: ErrorMap[typeof ERROR_CODE]) => {
+            switch (code) {
+                case ErrorCode.InvalidRequest: return 'InvalidRequest';
+                case ErrorCode.MethodNotFound: return 'MethodNotFound';
+                case ErrorCode.InvalidParams: return 'InvalidParams';
+                case ErrorCode.InternalError: return 'InternalError';
+                case ErrorCode.ParseError: return 'ParseError';
+                case ErrorCode.MethodCallTimeout: return 'MethodCallTimeout';
+                case ErrorCode.MethodCallCancelled: return 'MethodCallCancelled';
+                case ErrorCode.MethodCallException: return 'MethodCallException';
+                case ErrorCode.Unknown: return 'Unknown';
+                case ErrorCode.LoginRequired: return 'LoginRequired';
+                case ErrorCode.UserIDRequired: return 'UserIDRequired';
+                case ErrorCode.NotImplemented: return 'NotImplemented';
+                default: return 'Unknown RpcError';
+            }
+        };
+
+        super(err_info[ERROR_MESSAGE] ?? `${errorCodeToMessage(err_info[ERROR_CODE])} (${err_info[ERROR_CODE]})`);
     }
 
     data() {
