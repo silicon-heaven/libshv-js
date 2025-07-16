@@ -2,6 +2,7 @@ import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} 
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
+import * as z from './zod';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
@@ -60,12 +61,15 @@ export class RequestHandler {
     }
 }
 
+export const LsParamZod = z.undefined().or(z.string());
+export const DirParamZod = z.undefined().or(z.boolean()).or(z.string());
+
 type RequestHandlerParams = {
-    shvPath: string;
-    method: string;
-    param: RpcValue;
-    accessLevel: number;
-    delay: (progress: number) => void;
+    readonly shvPath: string;
+    readonly method: string;
+    param<ParamType extends RpcValue>(parser: z.ZodType<ParamType>): ParamType;
+    readonly accessLevel: number;
+    readonly delay: (progress: number) => void;
 };
 
 type WsClientOptionsLogin = WsClientOptionsCommon & {
@@ -262,15 +266,24 @@ class WsClient {
                 try {
                     const shvPath = request.meta[RPC_MESSAGE_SHV_PATH];
                     const method = request.meta[RPC_MESSAGE_METHOD];
+
                     const accessLevel = request.meta[RPC_MESSAGE_ACCESS_LEVEL];
                     if (accessLevel === undefined) {
                         throw new MethodNotFound(`Unknown method ${method} on path ${shvPath}`);
                     }
 
+                    const requestParam = request.value[RPC_MESSAGE_PARAMS];
                     let result = this.options.onRequest({
                         shvPath,
                         method,
-                        param: request.value[RPC_MESSAGE_PARAMS],
+                        param: (parser) => {
+                            const parsed = parser.safeParse(requestParam);
+                            if (!parsed.success) {
+                                throw new InvalidParams(`Unexpected param for method ${method} on path ${shvPath}: ${toCpon(requestParam)}`);
+                            }
+
+                            return parsed.data;
+                        },
                         accessLevel,
                         delay: sendDelay,
                     });
