@@ -94,7 +94,7 @@ export const DIR_RESULT = 4;
 export const DIR_ACCESS = 5;
 export const DIR_SIGNALS = 6;
 export const DIR_EXTRA = 63;
-type DirResult = Array<IMap<{
+export type DirResult = Array<IMap<{
     [DIR_NAME]: string;
     [DIR_FLAGS]: DirFlags;
     [DIR_PARAM]: string | Null;
