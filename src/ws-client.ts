@@ -60,6 +60,14 @@ export class RequestHandler {
     }
 }
 
+type RequestHandlerParams = {
+    shvPath: string;
+    method: string;
+    param: RpcValue;
+    accessLevel: number;
+    delay: (progress: number) => void;
+};
+
 type WsClientOptionsLogin = WsClientOptionsCommon & {
     mountPoint?: string;
     login: Login;
@@ -68,7 +76,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (shvPath: string, method: string, param: RpcValue, accessLevel: number, delay: (progress: number) => void) => RpcValue | Promise<RpcValue> | RequestHandler;
+    onRequest: (request: RequestHandlerParams) => RpcValue | Promise<RpcValue> | RequestHandler;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -259,7 +267,13 @@ class WsClient {
                         throw new MethodNotFound(`Unknown method ${method} on path ${shvPath}`);
                     }
 
-                    let result = this.options.onRequest(shvPath, method, request.value[RPC_MESSAGE_PARAMS], accessLevel, sendDelay);
+                    let result = this.options.onRequest({
+                        shvPath,
+                        method,
+                        param: request.value[RPC_MESSAGE_PARAMS],
+                        accessLevel,
+                        delay: sendDelay,
+                    });
                     if (result instanceof RequestHandler) {
                         this.requestHandlers.set(requestId, result);
                         result = result.options.result;
