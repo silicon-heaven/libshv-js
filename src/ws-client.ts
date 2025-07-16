@@ -1,3 +1,4 @@
+import {accessLevelFromAccessString} from './access';
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
@@ -63,13 +64,25 @@ export class RequestHandler {
 
 export const LsParamZod = z.undefined().or(z.string());
 export const DirParamZod = z.undefined().or(z.boolean()).or(z.string());
+type DirParam = z.infer<typeof DirParamZod>;
 
-type RequestHandlerParams = {
-    readonly shvPath: string;
-    readonly method: string;
-    param<ParamType extends RpcValue>(parser: z.ZodType<ParamType>): ParamType;
-    readonly accessLevel: number;
-    readonly delay: (progress: number) => void;
+export type DirEntry = IMap<{
+    [DIR_NAME]: string;
+    [DIR_FLAGS]: DirFlags;
+    [DIR_PARAM]: string | Null;
+    [DIR_RESULT]: string | Null;
+    [DIR_ACCESS]: Int;
+    [DIR_SIGNALS]: ShvMap<Record<string, string | Null>>;
+    [DIR_EXTRA]: ShvMap;
+}>;
+
+export type DirResult = DirEntry[];
+
+export type MethodHandler = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    paramParser: z.ZodType<any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handler: (shvPath: string, method: string, params: any, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
 };
 
 type WsClientOptionsLogin = WsClientOptionsCommon & {
@@ -80,7 +93,7 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (request: RequestHandlerParams) => RpcValue | Promise<RpcValue> | RequestHandler;
+    onRequest: (shvPath: string) => Array<{entry: DirEntry} & MethodHandler> | undefined;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -106,15 +119,6 @@ export const DIR_RESULT = 4;
 export const DIR_ACCESS = 5;
 export const DIR_SIGNALS = 6;
 export const DIR_EXTRA = 63;
-export type DirResult = Array<IMap<{
-    [DIR_NAME]: string;
-    [DIR_FLAGS]: DirFlags;
-    [DIR_PARAM]: string | Null;
-    [DIR_RESULT]: string | Null;
-    [DIR_ACCESS]: Int;
-    [DIR_SIGNALS]: ShvMap<Record<string, string | Null>>;
-    [DIR_EXTRA]: ShvMap;
-}>>;
 
 class RpcError extends Error {
     constructor(readonly err_info: ErrorMap) {
@@ -228,6 +232,7 @@ class WsClient {
             }
         };
 
+        // eslint-disable-next-line complexity
         const handleRequest = async (request: RpcRequest) => {
             if ('onRequest' in this.options) {
                 const requestId = request.meta[RPC_MESSAGE_REQUEST_ID];
@@ -265,28 +270,77 @@ class WsClient {
 
                 try {
                     const shvPath = request.meta[RPC_MESSAGE_SHV_PATH];
-                    const method = request.meta[RPC_MESSAGE_METHOD];
+                    const methodName = request.meta[RPC_MESSAGE_METHOD];
+                    const unhandledMethod = () => {
+                        throw new MethodNotFound(`No such path '${shvPath}' or method '${methodName}' or insufficient access rights.`);
+                    };
 
                     const accessLevel = request.meta[RPC_MESSAGE_ACCESS_LEVEL];
                     if (accessLevel === undefined) {
-                        throw new MethodNotFound(`Unknown method ${method} on path ${shvPath}`);
+                        unhandledMethod();
+                        return;
+                    }
+
+                    const methods = this.options.onRequest(shvPath);
+                    if (methods === undefined) {
+                        unhandledMethod();
+                        return;
+                    }
+
+                    const methodDefinition = ((): {entry: DirEntry} & MethodHandler | undefined => {
+                        const dirEntry = makeIMap({
+                            [DIR_NAME]: 'dir',
+                            [DIR_FLAGS]: 0,
+                            [DIR_PARAM]: '',
+                            [DIR_RESULT]: '',
+                            [DIR_ACCESS]: accessLevelFromAccessString('rd'),
+                            [DIR_SIGNALS]: makeMap({}),
+                            [DIR_EXTRA]: makeMap({}),
+                        });
+                        switch (methodName) {
+                            case 'dir':
+                                return {
+                                    entry: dirEntry,
+                                    paramParser: DirParamZod,
+                                    handler(_shvPath, _method, param: DirParam) {
+                                        const methodsResult = [dirEntry, ...methods.map(method => method.entry)];
+                                        switch (true) {
+                                            case typeof param === 'string':
+                                                return methodsResult.find(method => method[DIR_NAME] === param) ?? false;
+                                            case typeof param === 'boolean':
+                                            case param === undefined:
+                                                console.log('methodsResult', '=', methodsResult);
+                                                return methodsResult;
+                                        }
+                                    },
+                                };
+                            default:
+                                return methods.find(method => method.entry[DIR_NAME] === methodName);
+                        }
+                    })();
+
+                    if (methodDefinition === undefined) {
+                        unhandledMethod();
+                        return;
+                    }
+
+                    if (accessLevel < methodDefinition.entry[DIR_ACCESS]) {
+                        unhandledMethod();
+                        return;
                     }
 
                     const requestParam = request.value[RPC_MESSAGE_PARAMS];
-                    let result = this.options.onRequest({
-                        shvPath,
-                        method,
-                        param: (parser) => {
-                            const parsed = parser.safeParse(requestParam);
-                            if (!parsed.success) {
-                                throw new InvalidParams(`Unexpected param for method ${method} on path ${shvPath}: ${toCpon(requestParam)}`);
-                            }
+                    const parsedParam = methodDefinition.paramParser.safeParse(requestParam);
+                    if (!parsedParam.success) {
+                        throw new InvalidParams(`Unexpected param for method ${methodName} on path ${shvPath}: ${toCpon(requestParam)}`);
+                    }
 
-                            return parsed.data;
-                        },
-                        accessLevel,
-                        delay: sendDelay,
-                    });
+                    let result = methodDefinition.handler(
+                        shvPath,
+                        methodName,
+                        parsedParam.data,
+                        sendDelay,
+                    );
                     if (result instanceof RequestHandler) {
                         this.requestHandlers.set(requestId, result);
                         result = result.options.result;
