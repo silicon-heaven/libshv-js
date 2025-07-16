@@ -187,7 +187,7 @@ class WsClient {
         delayCallback?: (progress: number) => void;
         timeout_handle: ReturnType<typeof globalThis.setTimeout>;
     }> = [];
-    private requestHandlers: RequestHandler[] = [];
+    private requestHandlers = new Map<number, RequestHandler>();
     private abortedRequests = new Set<number>();
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
@@ -236,7 +236,7 @@ class WsClient {
                 };
 
                 if (RPC_MESSAGE_ABORT in request.value) {
-                    const requestHandler = this.requestHandlers[requestId];
+                    const requestHandler = this.requestHandlers.get(requestId);
 
                     if (request.value[RPC_MESSAGE_ABORT] === true && requestHandler?.options.onAbort !== undefined) {
                         this.abortedRequests.add(requestId);
@@ -254,7 +254,7 @@ class WsClient {
                 try {
                     let result = this.options.onRequest(request.meta[RPC_MESSAGE_SHV_PATH], request.meta[RPC_MESSAGE_METHOD], request.value[RPC_MESSAGE_PARAMS], sendDelay);
                     if (result instanceof RequestHandler) {
-                        this.requestHandlers[requestId] = result;
+                        this.requestHandlers.set(requestId, result);
                         result = result.options.result;
                     }
 
@@ -269,8 +269,7 @@ class WsClient {
                     }
 
                     if (requestId in this.requestHandlers) {
-                        // eslint-disable-next-line @typescript-eslint/no-array-delete
-                        delete this.requestHandlers[requestId];
+                        this.requestHandlers.delete(requestId);
                     }
                 } catch (error: unknown) {
                     const sendError = (error: RpcError) => {
