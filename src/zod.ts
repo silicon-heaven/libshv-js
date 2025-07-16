@@ -29,7 +29,6 @@ export const map = <T extends Record<string, ZodType<any>>>(schema: T) => implMa
 export const imap = <T extends Record<number, ZodType<any>>>(schema: T) => implMakeMapParser(isIMap, 'imap', 'IMap', z.object(schema));
 export const metamap = <T extends Record<string | number, ZodType<any>>>(schema: T) => implMakeMapParser(isMetaMap, 'metamap', 'MetaMap', z.object(schema));
 export const recmap = <T extends ZodType<any>>(schema: T) => implMakeMapParser(val => isShvMap(val) || isIMap(val), 'map', 'ShvMap', z.record(z.any(), schema));
-export const int = () => z.number();
 
 export const uint = () => z.instanceof(UInt<number>);
 export const double = () => z.instanceof(Double);
