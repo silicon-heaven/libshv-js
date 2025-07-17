@@ -291,9 +291,9 @@ class WsClient {
                         const dirEntry = makeIMap({
                             [DIR_NAME]: 'dir',
                             [DIR_FLAGS]: 0,
-                            [DIR_PARAM]: '',
-                            [DIR_RESULT]: '',
-                            [DIR_ACCESS]: accessLevelFromAccessString('rd'),
+                            [DIR_PARAM]: 'DirParam',
+                            [DIR_RESULT]: 'DirResult',
+                            [DIR_ACCESS]: accessLevelFromAccessString('bws'),
                             [DIR_SIGNALS]: makeMap({}),
                             [DIR_EXTRA]: makeMap({}),
                         });
