@@ -64,7 +64,6 @@ export class RequestHandler {
 
 export const LsParamZod = z.undefined().or(z.string());
 export const DirParamZod = z.undefined().or(z.boolean()).or(z.string());
-type DirParam = z.infer<typeof DirParamZod>;
 
 export type DirEntry = IMap<{
     [DIR_NAME]: string;
@@ -79,10 +78,8 @@ export type DirEntry = IMap<{
 export type DirResult = DirEntry[];
 
 export type MethodHandler = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    paramParser: z.ZodType<any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handler: (shvPath: string, method: string, params: any, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
+    paramParser: z.ZodType<RpcValue>,
+    handler: (shvPath: string, method: string, params: RpcValue, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
 };
 
 type WsClientOptionsLogin = WsClientOptionsCommon & {
