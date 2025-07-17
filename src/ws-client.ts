@@ -309,7 +309,6 @@ class WsClient {
                                                 return methodsResult.find(method => method[DIR_NAME] === param) ?? false;
                                             case typeof param === 'boolean':
                                             case param === undefined:
-                                                console.log('methodsResult', '=', methodsResult);
                                                 return methodsResult;
                                         }
                                     },
