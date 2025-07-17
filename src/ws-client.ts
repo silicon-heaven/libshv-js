@@ -352,7 +352,7 @@ class WsClient {
                     const requestParam = request.value[RPC_MESSAGE_PARAMS];
                     const parsedParam = methodDefinition.paramParser.safeParse(requestParam);
                     if (!parsedParam.success) {
-                        throw new InvalidParams(`Unexpected param for method ${methodName} on path ${shvPath}: ${toCpon(requestParam)}`);
+                        throw new InvalidParams(`Unexpected param for method ${methodName} on path '${shvPath}': ${toCpon(requestParam)}`);
                     }
 
                     let result = methodDefinition.handler(
