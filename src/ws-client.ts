@@ -67,7 +67,7 @@ export const DirParamZod = z.undefined().or(z.boolean()).or(z.string());
 
 export type DirEntry = IMap<{
     [DIR_NAME]: string;
-    [DIR_FLAGS]: DirFlags;
+    [DIR_FLAGS]: number;
     [DIR_PARAM]: string | Null;
     [DIR_RESULT]: string | Null;
     [DIR_ACCESS]: Int;
