@@ -93,7 +93,10 @@ type WsClientOptionsLogin = WsClientOptionsCommon & {
     onConnected: () => void;
     onConnectionFailure: (error: Error) => void;
     onDisconnected: () => void;
-    onRequest: (shvPath: string) => Array<{entry: DirEntry} & MethodHandler> | undefined;
+    onRequest: (shvPath: string) => {
+        ls: (shvPath: string) => string[] | Promise<string[]>;
+        dirEntries: Array<{entry: DirEntry} & MethodHandler>;
+    } | undefined;
 };
 
 type WsClientOptionsWorkflows = WsClientOptionsCommon & {
@@ -297,24 +300,42 @@ class WsClient {
                             [DIR_SIGNALS]: makeMap({}),
                             [DIR_EXTRA]: makeMap({}),
                         });
+                        const lsEntry = makeIMap({
+                            [DIR_NAME]: 'ls',
+                            [DIR_FLAGS]: 0,
+                            [DIR_PARAM]: 'LsParam',
+                            [DIR_RESULT]: 'LsResult',
+                            [DIR_ACCESS]: accessLevelFromAccessString('bws'),
+                            [DIR_SIGNALS]: makeMap({}),
+                            [DIR_EXTRA]: makeMap({}),
+                        });
                         switch (methodName) {
                             case 'dir':
                                 return {
                                     entry: dirEntry,
                                     paramParser: DirParamZod,
-                                    handler(_shvPath, _method, param: DirParam) {
-                                        const methodsResult = [dirEntry, ...methods.map(method => method.entry)];
+                                    handler(_shvPath, _method, param) {
+                                        const methodsResult = [dirEntry, lsEntry, ...methods.dirEntries.map(method => method.entry)];
                                         switch (true) {
                                             case typeof param === 'string':
                                                 return methodsResult.find(method => method[DIR_NAME] === param) ?? false;
                                             case typeof param === 'boolean':
                                             case param === undefined:
+                                                console.log('methodsResult', '=', methodsResult);
                                                 return methodsResult;
                                         }
                                     },
                                 };
+                            case 'ls':
+                                return {
+                                    entry: lsEntry,
+                                    paramParser: LsParamZod,
+                                    handler(shvPath) {
+                                        return methods.ls(shvPath);
+                                    },
+                                };
                             default:
-                                return methods.find(method => method.entry[DIR_NAME] === methodName);
+                                return methods.dirEntries.find(method => method.entry[DIR_NAME] === methodName);
                         }
                     })();
 
