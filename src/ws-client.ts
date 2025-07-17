@@ -255,9 +255,12 @@ class WsClient {
                 if (RPC_MESSAGE_ABORT in request.value) {
                     const requestHandler = this.requestHandlers.get(requestId);
 
-                    if (request.value[RPC_MESSAGE_ABORT] === true && requestHandler?.options.onAbort !== undefined) {
+                    if (request.value[RPC_MESSAGE_ABORT] === true) {
                         this.abortedRequests.add(requestId);
-                        requestHandler.options.onAbort();
+
+                        if (requestHandler?.options.onAbort !== undefined) {
+                            requestHandler.options.onAbort();
+                        }
                     }
 
                     if (request.value[RPC_MESSAGE_ABORT] === false && requestHandler?.options.onProgressQuery !== undefined) {
