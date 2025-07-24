@@ -20,6 +20,7 @@ type VueShvOptions = {
     wsUri: string;
     onRequest: WsClientOptionsLogin['onRequest'];
     azureCodeRedirect?: string;
+    mountPoint?: string;
 };
 
 type ShvLocalStorage = {
@@ -286,6 +287,7 @@ export function useShv(options: VueShvOptions) {
                     login: makeLoginOptions(),
                     wsUri: options.wsUri,
                     timeout: 120_000,
+                    mountPoint: options.mountPoint,
                     logDebug: debug,
                     onConnected() {
                         for (const waiter of waitingForSocket) {
