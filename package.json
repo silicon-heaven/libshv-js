@@ -1,12 +1,19 @@
 {
   "name": "libshv-js",
-  "version": "3.16.1",
+  "version": "3.17.0",
   "description": "Typescript implementation of libshv",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js && node dist-tests/tests/test_zod.js",
+    "test:ci": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js && node dist-tests/tests/test_zod.js",
     "lint": "eslint --format unix src/",
     "fix": "npm run lint -- --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -p tsconfig.tests.json --noEmit",
+    "build": "tsc"
   },
   "author": "Elektroline",
   "repository": {
@@ -18,16 +25,17 @@
   },
   "homepage": "https://github.com/silicon-heaven/libshv-js",
   "exports": {
-    "./access.ts": "./src/access.ts",
-    "./chainpack.ts": "./src/chainpack.ts",
-    "./cpcontext.ts": "./src/cpcontext.ts",
-    "./cpon.ts": "./src/cpon.ts",
-    "./json.ts": "./src/json.ts",
-    "./rpcmessage.ts": "./src/rpcmessage.ts",
-    "./rpcvalue.ts": "./src/rpcvalue.ts",
-    "./vue-shv.ts": "./src/vue-shv.ts",
-    "./ws-client.ts": "./src/ws-client.ts",
-    "./zod.ts": "./src/zod.ts"
+    ".": "./dist/index.js",
+    "./access": "./dist/access.js",
+    "./chainpack": "./dist/chainpack.js",
+    "./cpcontext": "./dist/cpcontext.js",
+    "./cpon": "./dist/cpon.js",
+    "./json": "./dist/json.js",
+    "./rpcmessage": "./dist/rpcmessage.js",
+    "./rpcvalue": "./dist/rpcvalue.js",
+    "./vue-shv": "./dist/vue-shv.js",
+    "./ws-client": "./dist/ws-client.js",
+    "./zod": "./dist/zod.js"
   },
   "dependencies": {
     "js-pkce": "^2.0.0",

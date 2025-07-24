@@ -3,6 +3,9 @@ import {WsClient, WsClientOptionsLogin} from './ws-client';
 import {useLocalStorage, useSessionStorage} from '@vueuse/core';
 import PKCE from 'js-pkce';
 import * as z from './zod';
+// @ts-expect-error - shvMapType is indirectly used by Zod, it's needed for exporting
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {type shvMapType} from './rpcvalue';
 import {RpcValue} from './rpcvalue';
 
 type GlobalResourceOptions<ResourceType> = {

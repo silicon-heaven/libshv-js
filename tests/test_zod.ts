@@ -1,6 +1,6 @@
-import { fromCpon } from './src/cpon';
-import { makeIMap, makeMap, makeMetaMap } from './src/rpcvalue';
-import * as z from './src/zod';
+import { fromCpon } from '../src/cpon';
+import { makeIMap, makeMap, makeMetaMap } from '../src/rpcvalue';
+import * as z from '../src/zod';
 
 z.map({ ok: z.boolean(), })
 	.parse(makeMap({ok: true}))
