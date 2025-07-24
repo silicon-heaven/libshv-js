@@ -57,7 +57,7 @@ const makePkce = (oauthOptions: {azureCodeRedirect: string, clientId: string; au
         client_id: oauthOptions.clientId,
         redirect_uri: (() => {
             const url = new URL(globalThis.location.href);
-            url.pathname = 'azureCode';
+            url.pathname = oauthOptions.azureCodeRedirect;
             url.search = '';
             return url.toString();
         })(),
