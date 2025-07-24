@@ -82,7 +82,7 @@ export type MethodHandler = {
     handler: (shvPath: string, method: string, params: RpcValue, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
 };
 
-type WsClientOptionsLogin = WsClientOptionsCommon & {
+export type WsClientOptionsLogin = WsClientOptionsCommon & {
     mountPoint?: string;
     login: Login;
     timeout?: number;

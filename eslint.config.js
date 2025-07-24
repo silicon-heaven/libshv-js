@@ -80,6 +80,7 @@ export default tseslint.config(
             "import/no-unassigned-import": "off",
             "no-dupe-class-members": "off",
             "no-negated-condition": "off",
+            "no-redeclare": "off",
             "no-unused-vars": "off",
             "no-useless-constructor": "off",
             "no-void": ["error", {
