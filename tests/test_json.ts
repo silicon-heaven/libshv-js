@@ -1,6 +1,6 @@
-import { toCpon } from "./src/cpon";
-import { fromJson, toJson } from "./src/json";
-import {makeIMap, makeMap, makeMetaMap, RpcValue, RpcValueWithMetaData, withOffset} from "./src/rpcvalue";
+import { toCpon } from "../src/cpon";
+import { fromJson, toJson } from "../src/json";
+import {makeIMap, makeMap, makeMetaMap, RpcValue, RpcValueWithMetaData, withOffset} from "../src/rpcvalue";
 
 const testJsonRoundTrip = (json: string, expected: RpcValue) => {
 	const parsed = fromJson(json);

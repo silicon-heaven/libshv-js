@@ -1,4 +1,7 @@
 import * as z from './zod';
+// @ts-expect-error - shvMapType is indirectly used by Zod, it's needed for exporting
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {type shvMapType} from './rpcvalue';
 
 export const RPC_MESSAGE_REQUEST_ID = 8;
 export const RPC_MESSAGE_SHV_PATH = 9;

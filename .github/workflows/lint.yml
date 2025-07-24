@@ -20,7 +20,7 @@ jobs:
       - name: Install tsc
         run: npm install
       - name: Run tsc
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   xo:
     name: xo
