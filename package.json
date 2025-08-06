@@ -41,7 +41,7 @@
     "js-pkce": "^2.0.0",
     "@vueuse/core": "^13.5.0",
     "vue": "^3.5.18",
-    "zod": "^4.0.5"
+    "zod": "4.0.5 - 4.0.10"
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8.38.0",
