@@ -544,11 +544,6 @@ class WsClient {
     }
 
     subscribe(subscriber: string, path: string, method: string, callback: SubscriptionCallback) {
-        if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.method === method)) {
-            this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
-            return;
-        }
-
         // If this path:method has not been subscribed on the broker, do it now
         if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
             this.callRpcMethod('.broker/app', 'subscribe', makeMap({
@@ -556,6 +551,12 @@ class WsClient {
             })).catch(() => {
                 this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
             });
+        }
+
+        const oldSubscriber = this.subscriptions.findIndex(val => val.subscriber === subscriber && val.path === path && val.method === method);
+        if (oldSubscriber !== -1) {
+            this.logDebug(`Removing previous subscription {$path}:${method} for subscriber ${subscriber}`);
+            this.subscriptions.splice(oldSubscriber, 1);
         }
 
         this.subscriptions.push({
