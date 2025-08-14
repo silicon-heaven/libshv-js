@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {z, type ZodType} from 'zod/v4';
 import {Decimal, Double, isIMap, isMetaMap, isShvMap, type MetaMap, RpcValue, type RpcValueType, RpcValueWithMetaData, shvMapType, typeName, UInt} from './rpcvalue';
+import {$ZodRawIssue} from 'zod/v4/core';
 
 const implMakeMapParser = <MapBrand extends string, ObjectParser extends ZodType<object>>(mapValidator: (val: unknown) => boolean, _mapBrand: MapBrand, mapName: string, objectParser: ObjectParser) => z.custom<z.infer<ObjectParser> & {[shvMapType]: MapBrand}>().check(ctx => {
     if (!mapValidator(ctx.value)) {
@@ -21,7 +22,7 @@ const implMakeMapParser = <MapBrand extends string, ObjectParser extends ZodType
     const parsedObject = objectParser.safeParse(rest);
 
     if (!parsedObject.success) {
-        ctx.issues = parsedObject.error.issues;
+        ctx.issues = parsedObject.error.issues as $ZodRawIssue[];
     }
 });
 
@@ -73,7 +74,7 @@ export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValu
                     input: ctx.value,
                     message: 'Wrong RpcValueWithMetaData meta',
                 },
-                ...parsedMeta.error.issues,
+                ...parsedMeta.error.issues as $ZodRawIssue[],
             ];
             return;
         }
@@ -87,7 +88,7 @@ export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValu
                     input: ctx.value,
                     message: 'Wrong RpcValueWithMetaData value',
                 },
-                ...parsedValue.error.issues,
+                ...parsedValue.error.issues as $ZodRawIssue[],
             ];
         }
     });
