@@ -21,7 +21,7 @@ const implMakeMapParser = <MapBrand extends string, ObjectParser extends ZodType
     const parsedObject = objectParser.safeParse(rest);
 
     if (!parsedObject.success) {
-        ctx.issues = parsedObject.error.issues;
+        ctx.issues = parsedObject.error.issues as typeof ctx.issues;
     }
 });
 
@@ -73,7 +73,7 @@ export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValu
                     input: ctx.value,
                     message: 'Wrong RpcValueWithMetaData meta',
                 },
-                ...parsedMeta.error.issues,
+                ...parsedMeta.error.issues as typeof ctx.issues,
             ];
             return;
         }
@@ -87,7 +87,7 @@ export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValu
                     input: ctx.value,
                     message: 'Wrong RpcValueWithMetaData value',
                 },
-                ...parsedValue.error.issues,
+                ...parsedValue.error.issues as typeof ctx.issues,
             ];
         }
     });
