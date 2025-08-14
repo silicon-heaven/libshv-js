@@ -151,14 +151,14 @@ export function useShv(options: VueShvOptions) {
         console.debug(...args);
     };
 
-    const azureAuth = (redirectTo?: string) => {
+    const azureAuth = (redirectTo: string) => {
         if (options.azureCodeRedirect === undefined) {
             throw new Error('Azure redirect URL not set');
         }
 
         const {azureCodeRedirect} = options;
 
-        shvLocalStorage.value.azureRedirectTo = redirectTo ?? globalThis.location.pathname;
+        shvLocalStorage.value.azureRedirectTo = redirectTo;
         const noBrokerSupport = () => {
             loginFailure.value = {
                 reason: LoginFailureReason.AzureUnsupported,
