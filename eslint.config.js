@@ -19,11 +19,12 @@ export default tseslint.config(
             },
         },
         rules: {
+            "@stylistic/function-paren-newline": ["off"],
             "@stylistic/indent": ["error", 4],
             "@stylistic/indent-binary-ops": ["error", 4],
             "@stylistic/max-len": ["off"],
             "@stylistic/multiline-ternary": ["off"],
-            "@stylistic/function-paren-newline": ["off"],
+            "@stylistic/operator-linebreak": ["off"],
             "@typescript-eslint/no-misused-promises": ["error", {
                 checksVoidReturn: false
             }],
