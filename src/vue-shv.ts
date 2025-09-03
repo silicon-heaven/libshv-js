@@ -8,6 +8,16 @@ import * as z from './zod';
 import {type shvMapType} from './rpcvalue';
 import {RpcValue} from './rpcvalue';
 
+export type StringGetter = string | Promise<string> | (() => string | Promise<string>);
+
+export const resolveString = (input: StringGetter) => {
+    if (typeof input === 'function') {
+        input = input();
+    }
+
+    return input;
+};
+
 type GlobalResourceOptions<ResourceType> = {
     shvPath: string;
     method: string;
@@ -17,7 +27,7 @@ type GlobalResourceOptions<ResourceType> = {
 };
 
 type VueShvOptions = {
-    wsUri: string;
+    wsUri: StringGetter;
     onRequest: WsClientOptionsLogin['onRequest'];
     azureCodeRedirect?: string;
     mountPoint?: string;
@@ -151,7 +161,7 @@ export function useShv(options: VueShvOptions) {
         console.debug(...args);
     };
 
-    const azureAuth = (redirectTo: string) => {
+    const azureAuth = async (redirectTo: string) => {
         if (options.azureCodeRedirect === undefined) {
             throw new Error('Azure redirect URL not set');
         }
@@ -168,7 +178,7 @@ export function useShv(options: VueShvOptions) {
 
         state.ws = new WsClient({
             logDebug: debug,
-            wsUri: options.wsUri,
+            wsUri: await resolveString(options.wsUri),
             onWorkflows(workflows) {
                 if (!Array.isArray(workflows)) {
                     noBrokerSupport();
@@ -265,8 +275,10 @@ export function useShv(options: VueShvOptions) {
             }
 
             connected.value = 'connecting';
-            const doConnect = (user: string, password: string, loginType: 'PLAIN' | 'TOKEN') => {
-                console.log('Connecting to', options.wsUri);
+            const doConnect = async (user: string, password: string, loginType: 'PLAIN' | 'TOKEN') => {
+                const wsUri = await resolveString(options.wsUri);
+                console.log('Connecting to', wsUri);
+
                 const makeLoginOptions = () => {
                     switch (loginType) {
                         case 'PLAIN':
@@ -285,7 +297,7 @@ export function useShv(options: VueShvOptions) {
 
                 state.ws = new WsClient({
                     login: makeLoginOptions(),
-                    wsUri: options.wsUri,
+                    wsUri,
                     timeout: 120_000,
                     mountPoint: options.mountPoint,
                     logDebug: debug,
@@ -295,11 +307,11 @@ export function useShv(options: VueShvOptions) {
                         }
 
                         waitingForSocket.length = 0;
-                        console.log('Connected to', options.wsUri);
+                        console.log('Connected to', wsUri);
                         connected.value = 'connected';
                     },
                     onConnectionFailure(error) {
-                        console.error(`Failed to connect to: ${options.wsUri}`, error);
+                        console.error(`Failed to connect to: ${wsUri}`, error);
                         shvLogout();
                         loginFailure.value = {
                             reason: LoginFailureReason.CouldntLogin,
@@ -310,7 +322,7 @@ export function useShv(options: VueShvOptions) {
                         connected.value = 'disconnected';
                         const RECONNECT_INTERVAL = 3000;
                         if (shvLocalStorage.value.azureAccessToken !== undefined) {
-                            console.log('Disconnected from', options.wsUri, 'reconnecting in', RECONNECT_INTERVAL, 'ms');
+                            console.log('Disconnected from', wsUri, 'reconnecting in', RECONNECT_INTERVAL, 'ms');
                             state.reconnectService = globalThis.setTimeout(async () => {
                                 await getConnection();
                             }, RECONNECT_INTERVAL);
@@ -326,7 +338,10 @@ export function useShv(options: VueShvOptions) {
                 displayName.value = shvUser;
                 displayShortName.value = shvUser[0];
                 displayFullName.value = shvUser;
-                doConnect(shvUser, shvPassword, 'PLAIN');
+                doConnect(shvUser, shvPassword, 'PLAIN')
+                    .catch((error: unknown) => {
+                        console.error('Unexpected failure in doConnect:', error);
+                    });
                 return;
             }
 
@@ -346,7 +361,10 @@ export function useShv(options: VueShvOptions) {
                 const accessToken = shvLocalStorage.value.azureAccessToken;
 
                 if (accessToken !== undefined) {
-                    doConnect('', accessToken, 'TOKEN');
+                    doConnect('', accessToken, 'TOKEN')
+                        .catch((error: unknown) => {
+                            console.error('Unexpected failure in doConnect:', error);
+                        });
                 }
             }).catch((error: unknown) => {
                 console.error('Failed to fetch verify azure info, redirecting to the login page in 3 seconds', error);
