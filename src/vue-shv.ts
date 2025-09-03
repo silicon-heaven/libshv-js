@@ -19,7 +19,7 @@ export const resolveString = (input: StringGetter) => {
 };
 
 type GlobalResourceOptions<ResourceType> = {
-    shvPath: string;
+    shvPath: StringGetter;
     method: string;
     validator: z.ZodType<ResourceType>;
     signalName: string;
@@ -208,13 +208,13 @@ export function useShv(options: VueShvOptions) {
         shvSessionStorage.value.shvLoginPassword = password;
     };
 
-    const rpcCall = async (shvPath: string, method: string, params?: RpcValue) => {
+    const rpcCall = async (shvPath: StringGetter, method: string, params?: RpcValue) => {
         const shv = await getConnection();
-        return shv.callRpcMethod(shvPath, method, params);
+        return shv.callRpcMethod(await resolveString(shvPath), method, params);
     };
 
-    const makeRpcCall = <ResultType>(shvPath: string, method: string, validator: z.ZodType<ResultType>) => async () => {
-        const resultOrError = await rpcCall(shvPath, method);
+    const makeRpcCall = <ResultType>(shvPath: StringGetter, method: string, validator: z.ZodType<ResultType>) => async () => {
+        const resultOrError = await rpcCall(await resolveString(shvPath), method);
         if (resultOrError instanceof Error) {
             return resultOrError;
         }
@@ -227,8 +227,8 @@ export function useShv(options: VueShvOptions) {
         return parsed.data;
     };
 
-    const makeRpcCallParam = <ResultType, ParamType extends RpcValue>(shvPath: string, method: string, _paramType: z.ZodType<ParamType>, validator: z.ZodType<ResultType>) => async (param: ParamType) => {
-        const resultOrError = await rpcCall(shvPath, method, param);
+    const makeRpcCallParam = <ResultType, ParamType extends RpcValue>(shvPath: StringGetter, method: string, _paramType: z.ZodType<ParamType>, validator: z.ZodType<ResultType>) => async (param: ParamType) => {
+        const resultOrError = await rpcCall(await resolveString(shvPath), method, param);
         if (resultOrError instanceof Error) {
             return resultOrError;
         }
@@ -382,7 +382,6 @@ export function useShv(options: VueShvOptions) {
     function makeGlobalResource<ResourceType>(options: GlobalResourceOptions<ResourceType> & {default: ResourceType}): () => ComputedRef<ResourceType>;
     function makeGlobalResource<ResourceType>(options: GlobalResourceOptions<ResourceType> & {default?: ResourceType}): () => ComputedRef<ResourceType> | Ref<ResourceType | undefined> {
         const resource = ref<ResourceType>();
-        const resIdentifier = `${options.shvPath}:${options.method}`;
 
         const resourceCall = makeRpcCall<ResourceType>(options.shvPath, options.method, options.validator);
         const refreshValue = async () => {
@@ -395,10 +394,12 @@ export function useShv(options: VueShvOptions) {
         };
 
         const initialize = async () => {
+            const shvPath = await resolveString(options.shvPath);
+            const resIdentifier = `${shvPath}:${options.method}`;
             try {
                 await refreshValue();
                 const connection = await getConnection();
-                connection.subscribe(`Global-${resIdentifier}:`, options.shvPath, options.signalName, (_path: string, _method: string, param: RpcValue) => {
+                await connection.subscribe(`Global-${resIdentifier}:`, shvPath, options.signalName, (_path: string, _method: string, param: RpcValue) => {
                     options.signalHandler(param, resource, async () => refreshValue().catch((error: unknown) => {
                         console.error(`Failed to initialize ${resIdentifier}`, error);
                     }));
@@ -413,11 +414,13 @@ export function useShv(options: VueShvOptions) {
         return () => {
             if (!initialized) {
                 initialized = true;
-                watchEffect(() => {
+                watchEffect(async () => {
                     if (connected.value !== 'connected') {
                         return;
                     }
 
+                    const shvPath = await resolveString(options.shvPath);
+                    const resIdentifier = `${shvPath}:${options.method}`;
                     initialize().catch((error: unknown) => {
                         console.error(`Failed to initialize ${resIdentifier}`, error);
                     });
