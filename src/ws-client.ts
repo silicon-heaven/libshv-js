@@ -3,6 +3,7 @@ import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} 
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
+import {resolveString, StringGetter} from './vue-shv';
 import * as z from './zod';
 
 const DEFAULT_TIMEOUT = 5000;
@@ -543,12 +544,13 @@ class WsClient {
         }
     }
 
-    subscribe(subscriber: string, path: string, method: string, callback: SubscriptionCallback) {
+    async subscribe(subscriber: string, pathGetter: StringGetter, method: string, callback: SubscriptionCallback) {
         if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.method === method)) {
             this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
             return;
         }
 
+        const path = await resolveString(pathGetter);
         // If this path:method has not been subscribed on the broker, do it now
         if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
             this.callRpcMethod('.broker/app', 'subscribe', makeMap({
@@ -566,7 +568,8 @@ class WsClient {
         });
     }
 
-    unsubscribe(subscriber: string, path: string, method: string) {
+    async unsubscribe(subscriber: string, pathGetter: StringGetter, method: string) {
+        const path = await resolveString(pathGetter);
         const idx = this.subscriptions.findIndex(val => val.subscriber === subscriber && val.path === path && val.method === method);
         if (idx === -1) {
             this.logDebug(`No such subscription ${path}:${method} for subscriber ${subscriber}`);
