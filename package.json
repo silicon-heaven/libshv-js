@@ -33,6 +33,7 @@
     "./json": "./dist/json.js",
     "./rpcmessage": "./dist/rpcmessage.js",
     "./rpcvalue": "./dist/rpcvalue.js",
+    "./utils": "./dist/utils.js",
     "./vue-shv": "./dist/vue-shv.js",
     "./ws-client": "./dist/ws-client.js",
     "./zod": "./dist/zod.js"
