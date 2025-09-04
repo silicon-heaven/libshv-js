@@ -7,16 +7,7 @@ import * as z from './zod';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {type shvMapType} from './rpcvalue';
 import {RpcValue} from './rpcvalue';
-
-export type StringGetter = string | Promise<string> | (() => string | Promise<string>);
-
-export const resolveString = (input: StringGetter) => {
-    if (typeof input === 'function') {
-        input = input();
-    }
-
-    return input;
-};
+import {resolveString, StringGetter} from './utils';
 
 type GlobalResourceOptions<ResourceType> = {
     shvPath: StringGetter;
