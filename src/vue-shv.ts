@@ -186,6 +186,8 @@ export function useShv(options: VueShvOptions) {
 
                     globalThis.location.replace(makePkce({...parsedWorkflow.data, azureCodeRedirect}).authorizeUrl());
                 }
+
+                noBrokerSupport();
             },
             onWorkflowsFailed() {
                 noBrokerSupport();
