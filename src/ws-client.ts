@@ -545,12 +545,12 @@ class WsClient {
     }
 
     async subscribe(subscriber: string, pathGetter: StringGetter, method: string, callback: SubscriptionCallback) {
+        const path = await resolveString(pathGetter);
         if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.method === method)) {
             this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
             return;
         }
 
-        const path = await resolveString(pathGetter);
         // If this path:method has not been subscribed on the broker, do it now
         if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
             this.callRpcMethod('.broker/app', 'subscribe', makeMap({
