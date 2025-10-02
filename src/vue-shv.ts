@@ -1,4 +1,4 @@
-import {computed, ComputedRef, Ref, ref, watchEffect} from 'vue';
+import {computed, ComputedRef, onWatcherCleanup, Ref, ref, watchEffect} from 'vue';
 import {WsClient, WsClientOptionsLogin} from './ws-client';
 import {useLocalStorage, useSessionStorage} from '@vueuse/core';
 import PKCE from 'js-pkce';
@@ -408,6 +408,11 @@ export function useShv(options: VueShvOptions) {
             if (!initialized) {
                 initialized = true;
                 watchEffect(async () => {
+                    onWatcherCleanup(() => {
+                        initialized = false;
+                        resource.value = undefined;
+                    });
+
                     if (connected.value !== 'connected') {
                         return;
                     }
