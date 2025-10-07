@@ -93,3 +93,4 @@ export const withMeta = <MetaSchema extends MetaMap, ValueSchema extends RpcValu
     });
 
 export * from 'zod/v4';
+export {z} from 'zod/v4';

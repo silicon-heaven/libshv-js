@@ -1,13 +1,18 @@
 import {accessLevelFromAccessString} from './access';
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, RpcMessageZod, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
 import {resolveString, StringGetter} from './utils';
-import * as z from './zod';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
+
+const defaultParseMessage = (rpcVal: RpcValue): RpcMessage => {
+    // Assume rpcVal is a valid RpcMessage - no runtime validation
+    const rpcMsg = rpcVal as RpcMessage;
+    return rpcMsg;
+};
 
 const dataToRpcValue = (buff: ArrayBuffer) => {
     const rd: ChainPackReader | CponReader = new ChainPackReader(buff);
@@ -51,6 +56,7 @@ type Login = {
 type WsClientOptionsCommon = {
     logDebug: (...args: string[]) => void;
     wsUri: string;
+    parseMessage?: (rpcVal: RpcValue) => RpcMessage;
 };
 
 export class RequestHandler {
@@ -63,8 +69,9 @@ export class RequestHandler {
     }
 }
 
-export const LsParamZod = z.undefined().or(z.string());
-export const DirParamZod = z.undefined().or(z.boolean()).or(z.string());
+export const validateLsParam = (param: RpcValue): param is string | undefined => param === undefined || typeof param === 'string';
+
+export const validateDirParam = (param: RpcValue): param is string | boolean | undefined => param === undefined || typeof param === 'string' || typeof param === 'boolean';
 
 export type DirEntry = IMap<{
     [DIR_NAME]: string;
@@ -79,11 +86,11 @@ export type DirEntry = IMap<{
 export type DirResult = DirEntry[];
 
 export type MethodHandler = {
-    paramParser: z.ZodType<RpcValue>,
+    paramValidator?: (param: RpcValue) => boolean,
     handler: (shvPath: string, method: string, params: RpcValue, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
 };
 
-export type WsClientOptionsLogin = WsClientOptionsCommon & {
+export type WsClientOptionsLogin<MethodHandlerType = MethodHandler> = WsClientOptionsCommon & {
     mountPoint?: string;
     login: Login;
     timeout?: number;
@@ -93,16 +100,16 @@ export type WsClientOptionsLogin = WsClientOptionsCommon & {
     onDisconnected: () => void;
     onRequest: (shvPath: string) => {
         ls: (shvPath: string) => string[] | Promise<string[]>;
-        dirEntries: Array<{entry: DirEntry} & MethodHandler>;
+        dirEntries: Array<{entry: DirEntry} & MethodHandlerType>;
     } | undefined;
 };
 
-type WsClientOptionsWorkflows = WsClientOptionsCommon & {
+export type WsClientOptionsWorkflows = WsClientOptionsCommon & {
     onWorkflows: (workflows: RpcValue) => void;
     onWorkflowsFailed: () => void;
 };
 
-type WsClientOptions = WsClientOptionsLogin | WsClientOptionsWorkflows;
+export type WsClientOptions<MethodHandlerType> = WsClientOptionsLogin<MethodHandlerType> | WsClientOptionsWorkflows;
 
 type LsResult = string[];
 export enum DirFlags {
@@ -208,10 +215,10 @@ class WsClient {
     private abortedRequests = new Set<number>();
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
-    private readonly options: WsClientOptions;
+    private readonly options: WsClientOptions<MethodHandler>;
     private readonly timeout: number;
 
-    constructor(options: WsClientOptions) {
+    constructor(options: WsClientOptions<MethodHandler>) {
         if (typeof options !== 'object') {
             throw new TypeError('No options object supplied');
         }
@@ -314,7 +321,7 @@ class WsClient {
                             case 'dir':
                                 return {
                                     entry: dirEntry,
-                                    paramParser: DirParamZod,
+                                    paramValidator: validateDirParam,
                                     handler(_shvPath, _method, param) {
                                         const methodsResult = [dirEntry, lsEntry, ...methods.dirEntries.map(method => method.entry)];
                                         switch (true) {
@@ -330,7 +337,7 @@ class WsClient {
                             case 'ls':
                                 return {
                                     entry: lsEntry,
-                                    paramParser: LsParamZod,
+                                    paramValidator: validateLsParam,
                                     handler(shvPath) {
                                         return methods.ls(shvPath);
                                     },
@@ -351,15 +358,14 @@ class WsClient {
                     }
 
                     const requestParam = request.value[RPC_MESSAGE_PARAMS];
-                    const parsedParam = methodDefinition.paramParser.safeParse(requestParam);
-                    if (!parsedParam.success) {
-                        throw new InvalidParams(`Unexpected param for '${shvPath}:${methodName}': ${toCpon(requestParam)}`);
+                    if (methodDefinition.paramValidator !== undefined && !methodDefinition.paramValidator(requestParam)) {
+                        throw new InvalidParams(`Unexpected param '${shvPath}:${methodName}': ${toCpon(requestParam)}`);
                     }
 
                     let result = methodDefinition.handler(
                         shvPath,
                         methodName,
-                        parsedParam.data,
+                        requestParam,
                         sendDelay,
                     );
                     if (result instanceof RequestHandler) {
@@ -463,8 +469,9 @@ class WsClient {
 
         this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
+            const parseMessage = this.options.parseMessage ?? defaultParseMessage;
+            const rpcMsg = parseMessage(rpcVal);
 
-            const rpcMsg = RpcMessageZod.parse(rpcVal);
             this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
             if (isSignal(rpcMsg)) {
@@ -603,7 +610,7 @@ class WsClient {
         this.websocket.close();
     }
 
-    private logDebug(...args: string[]) {
+    protected logDebug(...args: string[]) {
         if (this.options.logDebug === undefined) {
             return;
         }
