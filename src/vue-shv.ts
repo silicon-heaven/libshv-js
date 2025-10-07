@@ -1,5 +1,5 @@
 import {computed, ComputedRef, onWatcherCleanup, Ref, ref, watchEffect} from 'vue';
-import {WsClient, WsClientOptionsLogin} from './ws-client';
+import {type WsClient, type WsClientOptionsLogin} from './ws-client';
 import {useLocalStorage, useSessionStorage} from '@vueuse/core';
 import PKCE from 'js-pkce';
 import * as z from './zod';
@@ -8,6 +8,7 @@ import * as z from './zod';
 import {type shvMapType} from './rpcvalue';
 import {RpcValue} from './rpcvalue';
 import {resolveString, StringGetter} from './utils';
+import {createZodWsClient, ZodMethodHandler} from './zod-ws-client';
 
 type GlobalResourceOptions<ResourceType> = {
     shvPath: StringGetter;
@@ -19,7 +20,7 @@ type GlobalResourceOptions<ResourceType> = {
 
 type VueShvOptions = {
     wsUri: StringGetter;
-    onRequest: WsClientOptionsLogin['onRequest'];
+    onRequest: WsClientOptionsLogin<ZodMethodHandler>['onRequest'];
     azureCodeRedirect?: string;
     mountPoint?: string;
 };
@@ -167,7 +168,7 @@ export function useShv(options: VueShvOptions) {
             };
         };
 
-        state.ws = new WsClient({
+        state.ws = createZodWsClient({
             logDebug: debug,
             wsUri: await resolveString(options.wsUri),
             onWorkflows(workflows) {
@@ -288,7 +289,7 @@ export function useShv(options: VueShvOptions) {
                     }
                 };
 
-                state.ws = new WsClient({
+                state.ws = createZodWsClient({
                     login: makeLoginOptions(),
                     wsUri,
                     timeout: 120_000,

@@ -8,3 +8,4 @@ export * from './rpcvalue';
 export * from './vue-shv';
 export * from './ws-client';
 export * from './zod';
+export * from './zod-ws-client';
