@@ -1,7 +1,4 @@
-import * as z from './zod';
-// @ts-expect-error - shvMapType is indirectly used by Zod, it's needed for exporting
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import {type shvMapType} from './rpcvalue';
+import {Double, IMap, MetaMap, RpcValue, type RpcValueWithMetaData} from './rpcvalue';
 
 export const RPC_MESSAGE_REQUEST_ID = 8;
 export const RPC_MESSAGE_SHV_PATH = 9;
@@ -19,7 +16,7 @@ export const ERROR_CODE = 1;
 export const ERROR_MESSAGE = 2;
 export const ERROR_DATA = 3;
 
-enum ErrorCode {
+export enum ErrorCode {
     InvalidRequest = 1,
     MethodNotFound = 2,
     InvalidParams = 3,
@@ -34,61 +31,54 @@ enum ErrorCode {
     NotImplemented = 12,
 }
 
-const ErrorMapZod = z.imap({
-    [ERROR_CODE]: z.number(),
-    [ERROR_MESSAGE]: z.string().optional(),
-    [ERROR_DATA]: z.rpcvalue().optional(),
-});
+export type ErrorMap = IMap<{
+    [ERROR_CODE]: number;
+    [ERROR_MESSAGE]?: string | undefined;
+    [ERROR_DATA]?: RpcValue;
+}>;
 
-export type ErrorMap = z.infer<typeof ErrorMapZod>;
+type RpcRequestMeta = MetaMap<{
+    [RPC_MESSAGE_REQUEST_ID]: number;
+    [RPC_MESSAGE_SHV_PATH]: string;
+    [RPC_MESSAGE_METHOD]: string;
+    [RPC_MESSAGE_CALLER_IDS]?: number | number[] | undefined;
+    [RPC_MESSAGE_ACCESS_LEVEL]?: number | undefined;
+}>;
 
-const RpcRequestMetaZod = z.metamap({
-    [RPC_MESSAGE_CALLER_IDS]: z.int().or(z.array(z.int())).optional(),
-    [RPC_MESSAGE_REQUEST_ID]: z.number(),
-    [RPC_MESSAGE_METHOD]: z.string(),
-    [RPC_MESSAGE_SHV_PATH]: z.string(),
-    [RPC_MESSAGE_ACCESS_LEVEL]: z.int().gte(0).lte(63).optional(),
-});
+type RpcRequestValue = IMap<{
+    [RPC_MESSAGE_PARAMS]?: RpcValue;
+}> | IMap<{
+    [RPC_MESSAGE_ABORT]: boolean;
+}>;
 
-const RpcRequestValueZod = z.imap({
-    [RPC_MESSAGE_PARAMS]: z.rpcvalue().optional(),
-}).or(z.imap({
-    [RPC_MESSAGE_ABORT]: z.boolean(),
-}));
+export type RpcRequest = RpcValueWithMetaData<RpcRequestMeta, RpcRequestValue>;
 
-const RpcResponseMetaZod = z.metamap({
-    [RPC_MESSAGE_CALLER_IDS]: z.int().or(z.array(z.int())).optional(),
-    [RPC_MESSAGE_REQUEST_ID]: z.number(),
-});
+type RpcResponseMeta = MetaMap<{
+    [RPC_MESSAGE_REQUEST_ID]: number;
+    [RPC_MESSAGE_CALLER_IDS]?: number | number[] | undefined;
+}>;
 
-const RpcResponseValueZod = z.imap({
-    [RPC_MESSAGE_RESULT]: z.rpcvalue(),
-}).or(z.imap({
-    [RPC_MESSAGE_ERROR]: ErrorMapZod,
-})).or(z.imap({
-    [RPC_MESSAGE_DELAY]: z.double(),
-}));
+export type RpcResponseValue = IMap<{
+    [RPC_MESSAGE_RESULT]: RpcValue;
+}> | IMap<{
+    [RPC_MESSAGE_ERROR]: ErrorMap;
+}> | IMap<{
+    [RPC_MESSAGE_DELAY]: Double;
+}>;
 
-const RpcSignalMetaZod = z.metamap({
-    [RPC_MESSAGE_SHV_PATH]: z.string(),
-    [RPC_MESSAGE_METHOD]: z.string(),
-});
-const RpcSignalValueZod = z.imap({
-    [RPC_MESSAGE_PARAMS]: z.rpcvalue().optional(),
-});
+export type RpcResponse = RpcValueWithMetaData<RpcResponseMeta, RpcResponseValue>;
 
-const RpcRequestZod = z.withMeta(RpcRequestMetaZod, RpcRequestValueZod);
-const RpcResponseZod = z.withMeta(RpcResponseMetaZod, RpcResponseValueZod);
-const RpcSignalZod = z.withMeta(RpcSignalMetaZod, RpcSignalValueZod);
-const RpcMessageZod = z.union([RpcRequestZod, RpcResponseZod, RpcSignalZod]);
-export type RpcRequest = z.infer<typeof RpcRequestZod>;
-export type RpcResponse = z.infer<typeof RpcResponseZod>;
-export type RpcResponseValue = z.infer<typeof RpcResponseValueZod>;
-export type RpcSignal = z.infer<typeof RpcSignalZod>;
-export type RpcMessage = z.infer<typeof RpcMessageZod>;
+type RpcSignalMeta = MetaMap<{
+    [RPC_MESSAGE_SHV_PATH]: string;
+    [RPC_MESSAGE_METHOD]: string;
+}>;
+type RpcSignalValue = IMap<{
+    [RPC_MESSAGE_PARAMS]?: RpcValue;
+}>;
+export type RpcSignal = RpcValueWithMetaData<RpcSignalMeta, RpcSignalValue>;
+
+export type RpcMessage = RpcRequest | RpcResponse | RpcSignal;
 
 export const isSignal = (message: RpcMessage): message is RpcSignal => !(RPC_MESSAGE_REQUEST_ID in message.meta) && RPC_MESSAGE_METHOD in message.meta;
 export const isRequest = (message: RpcMessage): message is RpcRequest => RPC_MESSAGE_REQUEST_ID in message.meta && RPC_MESSAGE_METHOD in message.meta;
 export const isResponse = (message: RpcMessage): message is RpcResponse => RPC_MESSAGE_REQUEST_ID in message.meta && !(RPC_MESSAGE_METHOD in message.meta);
-
-export {RpcMessageZod, ErrorCode};
