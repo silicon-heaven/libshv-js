@@ -6,5 +6,3 @@ export * from './json';
 export * from './rpcmessage';
 export * from './rpcvalue';
 export * from './ws-client';
-export * from './zod';
-export * from './zod-ws-client';

@@ -8,8 +8,8 @@
     "dist"
   ],
   "scripts": {
-    "test": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js && node dist-tests/tests/test_zod.js",
-    "test:ci": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js && node dist-tests/tests/test_zod.js",
+    "test": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js",
+    "test:ci": "tsc -p tsconfig.tests.json && node dist-tests/tests/test.js && node dist-tests/tests/test_json.js",
     "lint": "eslint --format unix src/",
     "fix": "npm run lint -- --fix",
     "typecheck": "tsc -p tsconfig.tests.json --noEmit",
@@ -34,12 +34,7 @@
     "./rpcmessage": "./dist/rpcmessage.js",
     "./rpcvalue": "./dist/rpcvalue.js",
     "./utils": "./dist/utils.js",
-    "./ws-client": "./dist/ws-client.js",
-    "./zod": "./dist/zod.js",
-    "./zod-ws-client": "./dist/zod-ws-client.js"
-  },
-  "dependencies": {
-    "zod": "^4.0.11"
+    "./ws-client": "./dist/ws-client.js"
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8.38.0",
