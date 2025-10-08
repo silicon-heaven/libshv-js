@@ -56,7 +56,7 @@ export default tseslint.config(
                     "format": ["PascalCase"],
                     "selector": "variable",
                     "modifiers": ["const"],
-                    "filter": "Validation$|Zod$"
+                    "filter": "Validation$"
                 }
             ],
             "@typescript-eslint/prefer-promise-reject-errors": "off",
