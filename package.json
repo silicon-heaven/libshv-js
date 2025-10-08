@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "3.24.0",
+  "version": "3.25.0",
   "description": "Typescript implementation of libshv",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,15 +34,11 @@
     "./rpcmessage": "./dist/rpcmessage.js",
     "./rpcvalue": "./dist/rpcvalue.js",
     "./utils": "./dist/utils.js",
-    "./vue-shv": "./dist/vue-shv.js",
     "./ws-client": "./dist/ws-client.js",
     "./zod": "./dist/zod.js",
     "./zod-ws-client": "./dist/zod-ws-client.js"
   },
   "dependencies": {
-    "@vueuse/core": "^13.5.0",
-    "js-pkce": "^2.0.0",
-    "vue": "^3.5.22",
     "zod": "^4.0.11"
   },
   "devDependencies": {
