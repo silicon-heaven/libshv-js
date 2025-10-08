@@ -79,6 +79,12 @@ export type RpcSignal = RpcValueWithMetaData<RpcSignalMeta, RpcSignalValue>;
 
 export type RpcMessage = RpcRequest | RpcResponse | RpcSignal;
 
-export const isSignal = (message: RpcMessage): message is RpcSignal => !(RPC_MESSAGE_REQUEST_ID in message.meta) && RPC_MESSAGE_METHOD in message.meta;
-export const isRequest = (message: RpcMessage): message is RpcRequest => RPC_MESSAGE_REQUEST_ID in message.meta && RPC_MESSAGE_METHOD in message.meta;
-export const isResponse = (message: RpcMessage): message is RpcResponse => RPC_MESSAGE_REQUEST_ID in message.meta && !(RPC_MESSAGE_METHOD in message.meta);
+const implRpcMessage = (message: unknown): message is RpcMessage => typeof message === 'object'
+    && message !== null
+    && 'meta' in message
+    && typeof message.meta === 'object'
+    && message.meta !== null;
+
+export const isSignal = (message: unknown): message is RpcSignal => implRpcMessage(message) && !(RPC_MESSAGE_REQUEST_ID in message.meta) && RPC_MESSAGE_METHOD in message.meta;
+export const isRequest = (message: unknown): message is RpcRequest => implRpcMessage(message) && RPC_MESSAGE_REQUEST_ID in message.meta && RPC_MESSAGE_METHOD in message.meta;
+export const isResponse = (message: unknown): message is RpcResponse => implRpcMessage(message) && RPC_MESSAGE_REQUEST_ID in message.meta && !(RPC_MESSAGE_METHOD in message.meta);
