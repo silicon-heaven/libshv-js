@@ -597,7 +597,7 @@ class WsClient {
     }
 
     sendPing() {
-        this.callRpcMethod('.broker/app', 'ping').catch((error: unknown) => {
+        this.callRpcMethod('.app', 'ping').catch((error: unknown) => {
             console.log('Failed to send ping:', error);
         });
     }
