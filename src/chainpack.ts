@@ -48,7 +48,7 @@ const uint8ArrayBoBigint = (bytes: Uint8Array, type: 'Int' | 'UInt') => {
 
     let ret = 0n;
     for (const byte of bytes) {
-        ret = (ret * BigInt(256)) + BigInt(byte);
+        ret = (ret * 256n) + BigInt(byte);
     }
 
     if (isNeg) {
