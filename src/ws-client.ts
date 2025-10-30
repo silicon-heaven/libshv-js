@@ -3,7 +3,7 @@ import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} 
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
 import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
-import {resolveString, StringGetter} from './utils';
+import {resolveRI, RIGetter} from './utils';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
@@ -31,7 +31,7 @@ const dataToRpcValue = (buff: ArrayBuffer) => {
     return rpcVal;
 };
 
-type SubscriptionCallback = (path: string, method: string, param?: RpcValue) => void;
+type SubscriptionCallback = (path: string, signal: string, param?: RpcValue) => void;
 
 type ResultOrError<T = RpcValue> = T | Error;
 
@@ -40,7 +40,7 @@ type RpcResponseResolver = (rpc_msg: ResultOrError) => void;
 type Subscription = {
     subscriber: string;
     path: string;
-    method: string;
+    signal: string | undefined;
     callback: SubscriptionCallback;
 };
 
@@ -208,6 +208,11 @@ export type CallRpcMethodOptions = {
     requestUserId?: boolean;
 };
 
+enum ShvApiVersion {
+    V2,
+    V3,
+}
+
 class WsClient {
     private requestId = 1;
     private pingTimerId: ReturnType<typeof globalThis.setInterval> | undefined = undefined;
@@ -222,6 +227,7 @@ class WsClient {
     private readonly websocket: WebSocket;
     private readonly options: WsClientOptions<MethodHandler>;
     private readonly timeout: number;
+    private shvApiVersion: ShvApiVersion | undefined = undefined;
 
     constructor(options: WsClientOptions<MethodHandler>) {
         if (typeof options !== 'object') {
@@ -237,10 +243,10 @@ class WsClient {
         const handleSignal = (signal: RpcSignal) => {
             for (const sub of this.subscriptions) {
                 const shvPath = signal.meta[RPC_MESSAGE_SHV_PATH];
-                const method = signal.meta[RPC_MESSAGE_METHOD];
+                const signalName = signal.meta[RPC_MESSAGE_METHOD];
 
-                if (shvPath.startsWith(sub.path) && method === sub.method) {
-                    sub.callback(shvPath, method, signal.value[RPC_MESSAGE_PARAMS]);
+                if (shvPath.startsWith(sub.path) && signalName === sub.signal) {
+                    sub.callback(shvPath, signalName, signal.value[RPC_MESSAGE_PARAMS]);
                 }
             }
         };
@@ -558,49 +564,104 @@ class WsClient {
         }
     }
 
-    async subscribe(subscriber: string, pathGetter: StringGetter, method: string, callback: SubscriptionCallback) {
-        const path = await resolveString(pathGetter);
-        if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.method === method)) {
-            this.logDebug(`Already subscribed {$path}:${method} for subscriber ${subscriber}`);
+    async getShvApiVersion() {
+        if (this.shvApiVersion === undefined) {
+            const lsResult = await this.callRpcMethod('.broker', 'ls');
+            if (lsResult instanceof Error) {
+                console.warn('Cannot detect SHV API version. Using version 2 as a fallback.');
+                this.shvApiVersion = ShvApiVersion.V2;
+            } else if (lsResult.includes('client')) {
+                this.shvApiVersion = ShvApiVersion.V3;
+            } else {
+                this.shvApiVersion = ShvApiVersion.V2;
+            }
+        }
+
+        return this.shvApiVersion;
+    }
+
+    async subscribe(subscriber: string, riGetter: RIGetter, callback: SubscriptionCallback) {
+        const ri = await resolveRI(riGetter);
+        const path = ri.path();
+        const signal = ri.signal();
+        if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.signal === signal)) {
+            this.logDebug(`Already subscribed {$path}:${signal} for subscriber ${subscriber}`);
             return;
         }
 
-        // If this path:method has not been subscribed on the broker, do it now
-        if (!this.subscriptions.some(val => val.path === path && val.method === method)) {
-            this.callRpcMethod('.broker/app', 'subscribe', makeMap({
-                method, path,
-            })).catch(() => {
-                this.logDebug(`Couldn't subscribe to ${path}, ${method}`);
-            });
+        // If this path:signal has not been subscribed on the broker, do it now
+        if (!this.subscriptions.some(val => val.path === path && val.signal === signal)) {
+            switch (await this.getShvApiVersion()) {
+                case ShvApiVersion.V2: {
+                    const result = await this.callRpcMethod('.broker/app', 'subscribe', makeMap({signal, path}));
+                    if (result instanceof Error) {
+                        this.logDebug(`Couldn't subscribe to ${path}, ${signal}`);
+                    }
+
+                    if (result instanceof Error) {
+                        this.logDebug(`Couldn't subscribe to ${path}, ${signal}`);
+                        return;
+                    }
+
+                    break;
+                }
+
+                case ShvApiVersion.V3: {
+                    const result = await this.callRpcMethod('.broker/currentClient', 'subscribe', [ri.asString(), undefined]);
+
+                    if (result instanceof Error) {
+                        this.logDebug(`Couldn't subscribe to ${path}, ${signal}`);
+                        return;
+                    }
+
+                    break;
+                }
+            }
         }
 
         this.subscriptions.push({
             subscriber,
             path,
-            method,
+            signal,
             callback,
         });
     }
 
-    async unsubscribe(subscriber: string, pathGetter: StringGetter, method: string) {
-        const path = await resolveString(pathGetter);
-        const idx = this.subscriptions.findIndex(val => val.subscriber === subscriber && val.path === path && val.method === method);
+    async unsubscribe(subscriber: string, riGetter: RIGetter) {
+        const ri = await resolveRI(riGetter);
+        const path = ri.path();
+        const signal = ri.signal();
+        const idx = this.subscriptions.findIndex(val => val.subscriber === subscriber && val.path === path && val.signal === signal);
         if (idx === -1) {
-            this.logDebug(`No such subscription ${path}:${method} for subscriber ${subscriber}`);
+            this.logDebug(`No such subscription ${path}:${signal} for subscriber ${subscriber}`);
             return;
         }
 
         this.subscriptions.splice(idx, 1);
-        // Unsubscribe on the broker only if there are no other subscriptions of this path:method
-        if (this.subscriptions.some(val => val.path === path && val.method === method)) {
+        // Unsubscribe on the broker only if there are no other subscriptions of this path:signal
+        if (this.subscriptions.some(val => val.path === path && val.signal === signal)) {
             return;
         }
 
-        this.callRpcMethod('.broker/app', 'unsubscribe', makeMap({
-            method, path,
-        })).catch(() => {
-            this.logDebug(`Couldn't unsubscribe ${path}, ${method}`);
-        });
+        switch (await this.getShvApiVersion()) {
+            case ShvApiVersion.V2: {
+                const result = await this.callRpcMethod('.broker/app', 'unsubscribe', makeMap({signal, path}));
+                if (result instanceof Error) {
+                    this.logDebug(`Couldn't unsubscribe ${path}, ${signal}`);
+                }
+
+                break;
+            }
+
+            case ShvApiVersion.V3: {
+                const result = await this.callRpcMethod('.broker/currentClient', 'unsubscribe', makeMap({ri: ri.asString(), ttl: undefined}));
+                if (result instanceof Error) {
+                    this.logDebug(`Couldn't unsubscribe ${path}, ${signal}`);
+                }
+
+                break;
+            }
+        }
     }
 
     sendPing() {
