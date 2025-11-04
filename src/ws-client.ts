@@ -1,7 +1,7 @@
 import {accessLevelFromAccessString} from './access';
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
 import {resolveString, StringGetter} from './utils';
 
@@ -205,6 +205,7 @@ class RpcRequestPromise<Result> extends Promise<Result> {
 
 export type CallRpcMethodOptions = {
     delayCallback?: (progress: number) => void;
+    requestUserId?: boolean;
 };
 
 class WsClient {
@@ -511,6 +512,7 @@ class WsClient {
             [RPC_MESSAGE_REQUEST_ID]: rqId,
             [RPC_MESSAGE_METHOD]: method ?? '',
             [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
+            ...(options?.requestUserId === true ? {[RPC_MESSAGE_USER_ID]: ''} : {}),
         }), value);
         const rq: RpcRequest = makeRq(makeIMap({
             [RPC_MESSAGE_PARAMS]: params,
