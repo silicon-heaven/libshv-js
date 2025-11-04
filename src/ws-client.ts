@@ -496,6 +496,7 @@ class WsClient {
     }
 
     callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<string>>;
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessLevelForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<number>>;
     callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<DirResult>>;
     callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<LsResult>>;
     callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError>;
@@ -604,6 +605,10 @@ class WsClient {
 
     accessGrantForMethodCall(path: string, method: string) {
         return this.callRpcMethod('.broker/currentClient', 'accessGrantForMethodCall', [path, method]);
+    }
+
+    accessLevelForMethodCall(path: string, method: string) {
+        return this.callRpcMethod('.broker/currentClient', 'accessLevelForMethodCall', [path, method]);
     }
 
     close() {
