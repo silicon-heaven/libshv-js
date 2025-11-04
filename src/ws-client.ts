@@ -203,6 +203,10 @@ class RpcRequestPromise<Result> extends Promise<Result> {
     }
 }
 
+export type CallRpcMethodOptions = {
+    delayCallback?: (progress: number) => void;
+};
+
 class WsClient {
     private requestId = 1;
     private pingTimerId: ReturnType<typeof globalThis.setInterval> | undefined = undefined;
@@ -495,12 +499,12 @@ class WsClient {
         }
     }
 
-    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<string>>;
-    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessLevelForMethodCall', params: [string, string], delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<number>>;
-    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<DirResult>>;
-    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError<LsResult>>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError>;
-    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, delayCallback?: (progress: number) => void): RpcRequestPromise<ResultOrError> {
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<string>>;
+    callRpcMethod(shvPath: '.broker/currentClient', method: 'accessLevelForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<number>>;
+    callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<DirResult>>;
+    callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<LsResult>>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError>;
+    callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError> {
         const rqId = this.requestId++;
         const makeRq = (value: IMap) => new RpcValueWithMetaData(makeMetaMap({
             [RPC_MESSAGE_CALLER_IDS]: undefined,
@@ -515,7 +519,7 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new RpcRequestPromise<ResultOrError>(resolve => {
-            this.rpcHandlers[rqId] = {resolve, timeout_handle: makeTimeout(this.timeout, resolve), delayCallback};
+            this.rpcHandlers[rqId] = {resolve, timeout_handle: makeTimeout(this.timeout, resolve), delayCallback: options?.delayCallback};
         }, () => {
             this.sendRpcMessage(makeRq(makeIMap({
                 [RPC_MESSAGE_ABORT]: true,
