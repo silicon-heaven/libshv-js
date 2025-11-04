@@ -4,6 +4,7 @@ export const RPC_MESSAGE_REQUEST_ID = 8;
 export const RPC_MESSAGE_SHV_PATH = 9;
 export const RPC_MESSAGE_METHOD = 10;
 export const RPC_MESSAGE_CALLER_IDS = 11;
+export const RPC_MESSAGE_USER_ID = 16;
 export const RPC_MESSAGE_ACCESS_LEVEL = 17;
 
 export const RPC_MESSAGE_PARAMS = 1;
@@ -42,6 +43,7 @@ type RpcRequestMeta = MetaMap<{
     [RPC_MESSAGE_SHV_PATH]: string;
     [RPC_MESSAGE_METHOD]: string;
     [RPC_MESSAGE_CALLER_IDS]?: number | number[] | undefined;
+    [RPC_MESSAGE_USER_ID]?: string | undefined;
     [RPC_MESSAGE_ACCESS_LEVEL]?: number | undefined;
 }>;
 
