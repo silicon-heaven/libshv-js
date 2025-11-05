@@ -4,6 +4,7 @@ export const RPC_MESSAGE_REQUEST_ID = 8;
 export const RPC_MESSAGE_SHV_PATH = 9;
 export const RPC_MESSAGE_METHOD = 10;
 export const RPC_MESSAGE_CALLER_IDS = 11;
+export const RPC_MESSAGE_USER_ID = 16;
 
 export const RPC_MESSAGE_PARAMS = 1;
 export const RPC_MESSAGE_RESULT = 2;
@@ -42,6 +43,7 @@ const RpcRequestMetaZod = z.metamap({
     [RPC_MESSAGE_REQUEST_ID]: z.number(),
     [RPC_MESSAGE_METHOD]: z.string(),
     [RPC_MESSAGE_SHV_PATH]: z.string(),
+    [RPC_MESSAGE_USER_ID]: z.string(),
 });
 
 const RpcRequestValueZod = z.imap({
