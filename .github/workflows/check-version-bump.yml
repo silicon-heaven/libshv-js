@@ -38,16 +38,23 @@ jobs:
             echo Version bump detected: "$DEFAULT_BRANCH_VERSION -> $CURRENT_BRANCH_VERSION"
           fi
 
+      - name: Fetch Dependabot metadata
+        id: dependabot-metadata
+        if: steps.version-check.outcome == 'failure'
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: secrets.DEPENDABOT_GITHUB_TOKEN
+
       - name: Bump patch
-        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'patch')
+        if: steps.version-check.outcome == 'failure' && (steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.dependency-type == 'development')
         run: npm version minor --no-git-tag-version
 
       - name: Bump minor
-        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'minor')
+        if: steps.version-check.outcome == 'failure' && steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minot' && steps.dependabot-metadata.outputs.dependency-type == 'development'
         run: npm version minor --no-git-tag-version
 
       - name: Bump major
-        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'major')
+        if: steps.version-check.outcome == 'failure' && steps.dependabot-metadata.outputs.update-type == 'version-update:semver-major' && steps.dependabot-metadata.outputs.dependency-type != 'development'
         run: npm version major --no-git-tag-version
 
       - name: Commit changes
@@ -62,6 +69,6 @@ jobs:
         if: steps.version-check.outcome == 'failure'
         uses: Asana/push-signed-commits@v1
         with:
-          github-token: ${{ secrets.DEPENDABOT_GITHUB_TOKEN }}
+          github-token: secrets.DEPENDABOT_GITHUB_TOKEN
           local_branch_name: ${{github.head_ref}}
           remote_branch_name: ${{github.head_ref}}

@@ -16,6 +16,11 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm-deps:
+      npm-dev-deps:
         patterns:
           - '*'
+        dependency-type: development
+      npm-prod-deps:
+        patterns:
+          - '*'
+        dependency-type: production
