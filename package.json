@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "7.0.3",
+  "version": "7.0.4",
   "description": "Typescript implementation of libshv",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
