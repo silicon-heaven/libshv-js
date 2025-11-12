@@ -34,3 +34,31 @@ jobs:
           else
             echo Version bump detected: "$DEFAULT_BRANCH_VERSION -> $CURRENT_BRANCH_VERSION"
           fi
+
+      - name: Bump patch
+        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'patch')
+        run: npm version minor --no-git-tag-version
+
+      - name: Bump minor
+        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'minor')
+        run: npm version minor --no-git-tag-version
+
+      - name: Bump major
+        if: steps.version-check.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'major')
+        run: npm version major --no-git-tag-version
+
+      - name: Commit changes
+        if: steps.version-check.outcome == 'failure'
+        run: |
+          git diff
+          git config --global user.name "Login will be determined by the Github API based on the creator of the token"
+          git config --global user.email ""
+          git commit -am '[dependabot-skip] Bump version'
+
+      - name: Push changes
+        if: steps.version-check.outcome == 'failure'
+        uses: Asana/push-signed-commits@v1
+        with:
+          github-token: ${{ secrets.DEPENDABOT_GITHUB_TOKEN }}
+          local_branch_name: ${{github.head_ref}}
+          remote_branch_name: ${{github.head_ref}}
