@@ -16,7 +16,7 @@ jobs:
     name: Type check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install tsc
         run: npm install
       - name: Run tsc
@@ -26,7 +26,7 @@ jobs:
     name: xo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install tsc
         run: npm install
       - name: Run linters
