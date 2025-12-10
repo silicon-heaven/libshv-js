@@ -615,10 +615,6 @@ class ChainPackWriter {
 
     writeMapContent(map: MetaMap | ShvMap | IMap) {
         for (const [key, value] of Object.entries<RpcValue>(map)) {
-            if (value === undefined) {
-                continue;
-            }
-
             if (map[shvMapType] === 'imap') {
                 const intKey = Number(key);
                 if (Number.isNaN(intKey)) {
