@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "7.0.11",
+  "version": "7.0.12",
   "description": "Typescript implementation of libshv",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,11 +37,12 @@
     "./ws-client": "./dist/ws-client.js"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.46.1",
-    "eslint": "^9.38.0",
-    "eslint-config-xo": "^0.49.0",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.0",
+    "eslint-config-xo": "^0.50.0",
     "eslint-formatter-unix": "^9.0.1",
-    "eslint-plugin-unicorn": "^62.0.0",
+    "eslint-plugin-unicorn": "^63.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1"
   }
