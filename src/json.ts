@@ -31,7 +31,7 @@ const decodeValueJson = (x: unknown): RpcValue => {
                             throw new TypeError(`Invalid JSON-encoded IMap: '${JSON.stringify(typeValue)}'`);
                         }
 
-                        if (Object.keys(typeValue).some(key => !/^-?\d+$/.test(key))) {
+                        if (Object.keys(typeValue).some(key => !/^-?\d+$/v.test(key))) {
                             throw new TypeError(`Invalid JSON-encoded IMap (non-Int key): '${JSON.stringify(typeValue)}'`);
                         }
 
