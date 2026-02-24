@@ -266,51 +266,46 @@ class CponReader {
     }
 
     readDateTimeInner() {
-        let year = 0;
-        let month = 0;
-        let day = 1;
-        let hour = 0;
-        let min = 0;
-        let sec = 0;
-        let msec = 0;
         let utcOffset = 0;
 
-        year = Number(this.readInt());
+        const year = Number(this.readInt());
 
         let b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        month = Number(this.readInt());
+        const month = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        day = Number(this.readInt());
+        const day = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ' '.codePointAt(0) && b !== 'T'.codePointAt(0)) {
             throw new TypeError('Malformed date-time separator in DateTime');
         }
 
-        hour = Number(this.readInt());
+        const hour = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        min = Number(this.readInt());
+        const min = Number(this.readInt());
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        sec = Number(this.readInt());
+        const sec = Number(this.readInt());
+
+        let msec = 0;
 
         b = this.ctx.peekByte();
         if (b === '.'.codePointAt(0)) {
@@ -549,7 +544,6 @@ class CponReader {
     }
 
     readNumber() {
-        let mantisa = 0;
         let exponent = 0;
         let decimals = 0;
         let decCnt = 0;
@@ -566,7 +560,7 @@ class CponReader {
             b = this.ctx.getByte();
         }
 
-        mantisa = Number(this.readInt());
+        let mantisa = Number(this.readInt());
         b = this.ctx.peekByte();
         (() => {
             while (true) {
