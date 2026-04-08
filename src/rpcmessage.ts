@@ -1,4 +1,4 @@
-import {Double, IMap, MetaMap, RpcValue, type RpcValueWithMetaData} from './rpcvalue';
+import {type Double, type IMap, type MetaMap, type RpcValue, type RpcValueWithMetaData} from './rpcvalue';
 
 export const RPC_MESSAGE_REQUEST_ID = 8;
 export const RPC_MESSAGE_SHV_PATH = 9;

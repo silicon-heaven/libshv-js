@@ -1,7 +1,15 @@
 export class ShvRI {
-    private ri: string;
-    private methodSepIx: number;
-    private signalSepIx?: number;
+    static fromPathMethodSignal(path: string, method: string, signal?: string) {
+        const m = method.length === 0 ? '*' : method;
+        const ri = signal !== undefined
+            ? `${path}:${m}:${signal}`
+            : `${path}:${m}`;
+        return new ShvRI(ri);
+    }
+
+    private readonly ri: string;
+    private readonly methodSepIx: number;
+    private readonly signalSepIx?: number;
 
     constructor(ri: string) {
         const methodSepIx = ri.indexOf(':');
@@ -51,13 +59,5 @@ export class ShvRI {
 
     asString() {
         return this.ri;
-    }
-
-    static fromPathMethodSignal(path: string, method: string, signal?: string) {
-        const m = method.length === 0 ? '*' : method;
-        const ri = signal !== undefined
-            ? `${path}:${m}:${signal}`
-            : `${path}:${m}`;
-        return new ShvRI(ri);
     }
 }
