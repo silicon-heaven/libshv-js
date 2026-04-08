@@ -206,6 +206,7 @@ class RpcRequestPromise<Result> extends Promise<Result> {
 export type CallRpcMethodOptions = {
     delayCallback?: (progress: number) => void;
     requestUserId?: boolean;
+    beforeSendHook?: (rpcMessage: RpcRequest) => RpcRequest;
 };
 
 enum ShvApiVersion {
@@ -520,9 +521,14 @@ class WsClient {
             [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
             ...(options?.requestUserId === true ? {[RPC_MESSAGE_USER_ID]: ''} : {}),
         }), value);
-        const rq: RpcRequest = makeRq(makeIMap({
+
+        let rq: RpcRequest = makeRq(makeIMap({
             [RPC_MESSAGE_PARAMS]: params,
         }));
+
+        if (options?.beforeSendHook !== undefined) {
+            rq = options.beforeSendHook(rq);
+        }
 
         this.sendRpcMessage(rq);
 
