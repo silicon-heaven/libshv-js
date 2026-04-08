@@ -1,15 +1,16 @@
 import {accessLevelFromAccessString} from './access';
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, RpcSignal, RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, type RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, type RpcSignal, type RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage';
 import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
-import {resolveRI, RIGetter} from './utils';
+import {resolveRI, type RIGetter} from './utils';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
 
 const defaultParseMessage = (rpcVal: RpcValue): RpcMessage => {
     // Assume rpcVal is a valid RpcMessage - no runtime validation
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const rpcMsg = rpcVal as RpcMessage;
     return rpcMsg;
 };
@@ -86,8 +87,8 @@ export type DirEntry = IMap<{
 export type DirResult = DirEntry[];
 
 export type MethodHandler = {
-    paramValidator?: (param: RpcValue) => boolean,
-    handler: (shvPath: string, method: string, params: RpcValue, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler,
+    paramValidator?: (param: RpcValue) => boolean;
+    handler: (shvPath: string, method: string, params: RpcValue, delay: (progress: number) => void) => Promise<RpcValue> | RpcValue | RequestHandler;
 };
 
 export type WsClientOptionsLogin<MethodHandlerType = MethodHandler> = WsClientOptionsCommon & {
@@ -222,8 +223,9 @@ class WsClient {
         delayCallback?: (progress: number) => void;
         timeout_handle: ReturnType<typeof globalThis.setTimeout>;
     }> = [];
-    private requestHandlers = new Map<number, RequestHandler>();
-    private abortedRequests = new Set<number>();
+
+    private readonly requestHandlers = new Map<number, RequestHandler>();
+    private readonly abortedRequests = new Set<number>();
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
     private readonly options: WsClientOptions<MethodHandler>;
@@ -275,7 +277,7 @@ class WsClient {
                 if (RPC_MESSAGE_ABORT in request.value) {
                     const requestHandler = this.requestHandlers.get(requestId);
 
-                    if (request.value[RPC_MESSAGE_ABORT] === true) {
+                    if (request.value[RPC_MESSAGE_ABORT]) {
                         this.abortedRequests.add(requestId);
 
                         if (requestHandler?.options.onAbort !== undefined) {
@@ -283,7 +285,7 @@ class WsClient {
                         }
                     }
 
-                    if (request.value[RPC_MESSAGE_ABORT] === false && requestHandler?.options.onProgressQuery !== undefined) {
+                    if (!request.value[RPC_MESSAGE_ABORT] && requestHandler?.options.onProgressQuery !== undefined) {
                         const progress = requestHandler.options.onProgressQuery();
                         sendDelay(progress instanceof Promise ? await progress : progress);
                     }
@@ -474,11 +476,12 @@ class WsClient {
                         return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
                     }
                 })());
-                // eslint-disable-next-line @typescript-eslint/no-array-delete
+                // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
                 delete this.rpcHandlers[Number(requestId)];
             }
         };
 
+        // eslint-disable-next-line @typescript-eslint/strict-void-return
         this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
             const rpcVal = dataToRpcValue(evt.data);
             const parseMessage = this.options.parseMessage ?? defaultParseMessage;

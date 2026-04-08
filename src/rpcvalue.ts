@@ -96,10 +96,13 @@ type MetaMap<T extends Record<string | number, RpcValue> = Record<string | numbe
     [shvMapType]: 'metamap';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const isShvMap = (x: unknown): x is ShvMap => typeof x === 'object' && (x as ShvMap)[shvMapType] === 'map';
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const isIMap = (x: unknown): x is IMap => typeof x === 'object' && (x as IMap)[shvMapType] === 'imap';
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const isMetaMap = (x: unknown): x is IMap => typeof x === 'object' && (x as MetaMap)[shvMapType] === 'metamap';
 
 export const typeName = (x: unknown): string => {
@@ -121,16 +124,19 @@ export const typeName = (x: unknown): string => {
     }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const makeMetaMap = <T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): MetaMap<U> => ({
     ...x,
     [shvMapType]: 'metamap',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const makeIMap = <T extends Record<number, RpcValue> = Record<number, RpcValue>, U extends Record<number, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): IMap<U> => ({
     ...x,
     [shvMapType]: 'imap',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>, U extends Record<string, RpcValue> = Omit<T, typeof shvMapType>>(x: U = {} as U): ShvMap<U> => ({
     ...x,
     [shvMapType]: 'map',

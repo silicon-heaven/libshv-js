@@ -668,7 +668,7 @@ class CponWriter {
     ctx: PackContext;
     nestLevel = 0;
 
-    constructor(private readonly indentString?: string, private oneLiners: OneLiners = OneLiners.Yes) {
+    constructor(private readonly indentString?: string, private readonly oneLiners: OneLiners = OneLiners.Yes) {
         this.ctx = new PackContext();
     }
 

@@ -2,6 +2,7 @@ import {UnpackContext} from './cpcontext';
 import {CponReader, stringifyDate} from './cpon';
 import {Decimal, Double, isIMap, isShvMap, makeIMap, makeMap, makeMetaMap, RpcValueWithMetaData, UInt, type RpcValue} from './rpcvalue';
 
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 const decodeMap = (x: object) => makeMap(Object.fromEntries(Object.entries(x).map(([key, value]) => [key, decodeValueJson(value)])));
 
 const decodeValueJson = (x: unknown): RpcValue => {
@@ -122,7 +123,6 @@ const encodeValueJson = (x: RpcValue): unknown => {
         case x instanceof Date:
             return [JSON_TAG_TYPE, 'DateTime', stringifyDate(x)];
         case x === undefined:
-            // eslint-disable-next-line unicorn/no-null
             return null;
         case x instanceof Decimal:
         case x instanceof UInt:
