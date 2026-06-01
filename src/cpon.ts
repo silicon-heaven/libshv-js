@@ -1,4 +1,4 @@
-/* eslint-disable no-bitwise */
+/* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing cpon */
 import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue';
 import {PackContext, UnpackContext} from './cpcontext';
 
@@ -188,7 +188,7 @@ class CponReader {
         const LF = '\n'.codePointAt(0)!;
         const KEY_DELIM = ':'.codePointAt(0)!;
         const FIELD_DELIM = ','.codePointAt(0)!;
-        /* eslint-disable max-depth */
+        /* eslint-disable max-depth -- oh well */
         while (true) {
             let b = this.ctx.peekByte();
             if (b < 1) {

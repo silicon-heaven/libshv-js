@@ -1,4 +1,4 @@
-/* eslint-disable no-bitwise */
+/* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing chainpack */
 import {utf8ToString} from './cpon';
 import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
 import {UnpackContext, PackContext} from './cpcontext';
@@ -89,10 +89,10 @@ class ChainPackReader {
         this.ctx = data instanceof UnpackContext ? data : new UnpackContext(data);
     }
 
-    /* eslint-disable complexity */
+    /* eslint-disable complexity -- we might simplify this at some point, but it works now */
     read(): RpcValue {
         let meta: MetaMap | undefined;
-        let codePointAt = this.ctx.getByte() as PackingSchema;
+        let codePointAt = this.ctx.getByte();
 
         if (codePointAt === PackingSchema.MetaMap) {
             meta = this.readMetaMap();
@@ -318,7 +318,7 @@ class ChainPackReader {
         const lst = [];
         while (true) {
             const b = this.ctx.peekByte();
-            if (b as PackingSchema === PackingSchema.Term) {
+            if (b === PackingSchema.Term) {
                 this.ctx.getByte();
                 break;
             }
@@ -350,7 +350,7 @@ class ChainPackReader {
         };
         while (true) {
             const b = this.ctx.peekByte();
-            if (b as PackingSchema === PackingSchema.Term) {
+            if (b === PackingSchema.Term) {
                 this.ctx.getByte();
                 break;
             }

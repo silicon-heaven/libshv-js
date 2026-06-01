@@ -65,7 +65,7 @@ class PackContext {
     }
 
     writeCharCodeUtf8(charcode: number) {
-        /* eslint-disable no-bitwise */
+        /* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing chainpack */
         if (charcode < 0x80) {
             this.putByte(charcode);
         } else if (charcode < 0x8_00) {

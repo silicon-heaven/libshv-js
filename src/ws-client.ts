@@ -10,7 +10,6 @@ const DEFAULT_PING_INTERVAL = 30 * 1000;
 
 const defaultParseMessage = (rpcVal: RpcValue): RpcMessage => {
     // Assume rpcVal is a valid RpcMessage - no runtime validation
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const rpcMsg = rpcVal as RpcMessage;
     return rpcMsg;
 };
@@ -175,7 +174,7 @@ const createErrorClass = (code: ErrorCode) => class extends RpcError {
     }
 };
 
-/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/naming-convention -- We want class names like this */
 export const InvalidRequest = createErrorClass(ErrorCode.InvalidRequest);
 export const MethodNotFound = createErrorClass(ErrorCode.MethodNotFound);
 export const InvalidParams = createErrorClass(ErrorCode.InvalidParams);
