@@ -1,6 +1,6 @@
 {
   "name": "libshv-js",
-  "version": "7.1.4",
+  "version": "7.1.5",
   "description": "Typescript implementation of libshv",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,7 +42,7 @@
     "eslint": "^10.0.0",
     "eslint-config-xo": "^0.52.0",
     "eslint-formatter-unix": "^9.0.1",
-    "eslint-plugin-unicorn": "^65.0.0",
+    "eslint-plugin-unicorn": "^66.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.46.1"
   }
