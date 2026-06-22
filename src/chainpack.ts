@@ -89,6 +89,38 @@ class ChainPackReader {
         this.ctx = data instanceof UnpackContext ? data : new UnpackContext(data);
     }
 
+    private implReadMap(mapType: 'map'): ShvMap;
+    private implReadMap(mapType: 'imap'): IMap;
+    private implReadMap(mapType: 'metamap'): MetaMap;
+    private implReadMap(mapType: 'map' | 'imap' | 'metamap') {
+        const map: ShvMap | IMap | MetaMap = {
+            [shvMapType]: mapType,
+        };
+        while (true) {
+            const b = this.ctx.peekByte();
+            if (b === PackingSchema.Term) {
+                this.ctx.getByte();
+                break;
+            }
+
+            const key = this.read();
+            const val = this.read();
+            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'metamap' && typeof key === 'number') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'imap' && typeof key === 'number') {
+                map[key] = val;
+            } else {
+                throw new TypeError('Malformed map, invalid key');
+            }
+        }
+
+        return map;
+    }
+
     /* eslint-disable complexity -- we might simplify this at some point, but it works now */
     read(): RpcValue {
         let meta: MetaMap | undefined;
@@ -340,38 +372,6 @@ class ChainPackReader {
     readIMap() {
         return this.implReadMap('imap');
     }
-
-    private implReadMap(mapType: 'map'): ShvMap;
-    private implReadMap(mapType: 'imap'): IMap;
-    private implReadMap(mapType: 'metamap'): MetaMap;
-    private implReadMap(mapType: 'map' | 'imap' | 'metamap') {
-        const map: ShvMap | IMap | MetaMap = {
-            [shvMapType]: mapType,
-        };
-        while (true) {
-            const b = this.ctx.peekByte();
-            if (b === PackingSchema.Term) {
-                this.ctx.getByte();
-                break;
-            }
-
-            const key = this.read();
-            const val = this.read();
-            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
-                map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && typeof key === 'number') {
-                map[Number(key)] = val;
-            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
-                map[key] = val;
-            } else if (map[shvMapType] === 'imap' && typeof key === 'number') {
-                map[Number(key)] = val;
-            } else {
-                throw new TypeError('Malformed map, invalid key');
-            }
-        }
-
-        return map;
-    }
 }
 
 class ChainPackWriter {
@@ -499,13 +499,13 @@ class ChainPackWriter {
     }
 
     writeInt(n: Int) {
-        if (Number(n) >= 0 && Number(n) < 64) {
-            this.ctx.putByte(Number(n) + 64);
+        if (n >= 0 && n < 64) {
+            this.ctx.putByte(n + 64);
             return;
         }
 
         this.ctx.putByte(PackingSchema.Int);
-        this.writeIntData(Number(n));
+        this.writeIntData(n);
     }
 
     writeUInt(n: UInt) {
@@ -625,12 +625,12 @@ class ChainPackWriter {
             } else if (map[shvMapType] === 'metamap') {
                 const intKey = Number(key);
                 if (Number.isNaN(intKey)) {
-                    this.writeJSString(key.toString());
+                    this.writeJSString(key);
                 } else {
                     this.writeInt(intKey);
                 }
             } else {
-                this.writeJSString(key.toString());
+                this.writeJSString(key);
             }
 
             this.write(value);

@@ -1,6 +1,6 @@
 class UnpackContext {
-    index: number;
     private readonly data: Uint8Array;
+    index: number;
 
     constructor(buf: ArrayBufferLike) {
         this.data = new Uint8Array(buf);
@@ -80,6 +80,7 @@ class PackContext {
     }
 
     buffer() {
+        // eslint-disable-next-line unicorn/no-unsafe-buffer-conversion
         return this.data.buffer.slice(0, this.length);
     }
 }
