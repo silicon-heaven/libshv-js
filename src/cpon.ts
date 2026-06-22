@@ -90,6 +90,46 @@ class CponReader {
         this.ctx = unpackContext;
     }
 
+    private implReadMap(mapType: 'map', terminator: number): ShvMap;
+    private implReadMap(mapType: 'imap', terminator: number): IMap;
+    private implReadMap(mapType: 'metamap', terminator: number): MetaMap;
+    private implReadMap(mapType: 'map' | 'imap' | 'metamap', terminator: number) {
+        const map: MetaMap | ShvMap | IMap = {
+            [shvMapType]: mapType,
+        };
+        this.ctx.getByte(); // eat start
+        while (true) {
+            this.skipWhitespace();
+            const b = this.ctx.peekByte();
+            if (b === terminator) {
+                this.ctx.getByte();
+                break;
+            }
+
+            const key = this.read();
+            if (key instanceof RpcValueWithMetaData) {
+                throw new TypeError('Map/IMap/MetaMap key can\'t have its own MetaData');
+            }
+
+            this.skipWhitespace();
+            const val = this.read();
+
+            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || typeof key === 'number')) {
+                map[Number(key)] = val;
+            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
+                map[key] = val;
+            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || typeof key === 'number')) {
+                map[Number(key)] = val;
+            } else {
+                throw new TypeError('Malformed map, invalid key');
+            }
+        }
+
+        return map;
+    }
+
     read(): RpcValue {
         let meta: MetaMap | undefined;
         this.skipWhitespace();
@@ -266,54 +306,54 @@ class CponReader {
     }
 
     readDateTimeInner() {
-        let utcOffset = 0;
-
-        const year = Number(this.readInt());
+        const year = this.readInt();
 
         let b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        const month = Number(this.readInt());
+        const month = this.readInt();
 
         b = this.ctx.getByte();
         if (b !== '-'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        const day = Number(this.readInt());
+        const day = this.readInt();
 
         b = this.ctx.getByte();
         if (b !== ' '.codePointAt(0) && b !== 'T'.codePointAt(0)) {
             throw new TypeError('Malformed date-time separator in DateTime');
         }
 
-        const hour = Number(this.readInt());
+        const hour = this.readInt();
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        const min = Number(this.readInt());
+        const min = this.readInt();
 
         b = this.ctx.getByte();
         if (b !== ':'.codePointAt(0)) {
             throw new TypeError('Malformed year-month separator in DateTime');
         }
 
-        const sec = Number(this.readInt());
+        const sec = this.readInt();
 
         let msec = 0;
 
         b = this.ctx.peekByte();
         if (b === '.'.codePointAt(0)) {
             this.ctx.getByte();
-            msec = Number(this.readInt());
+            msec = this.readInt();
         }
 
         b = this.ctx.peekByte();
+        let utcOffset = 0;
+
         if (b === 'Z'.codePointAt(0)) {
             // zulu time
             this.ctx.getByte();
@@ -321,7 +361,7 @@ class CponReader {
             // UTC time offset
             this.ctx.getByte();
             const ix1 = this.ctx.index;
-            const val = Number(this.readInt());
+            const val = this.readInt();
             const n = this.ctx.index - ix1;
             if (!(n === 2 || n === 4)) {
                 throw new TypeError('Malformed TS offset in DateTime.');
@@ -441,10 +481,10 @@ class CponReader {
             if (b === '"'.codePointAt(0)) {
                 // end of string
                 break;
-            } else {
-                const b2 = (unhex(b) * 16) + unhex(this.ctx.getByte());
-                pctx.putByte(b2);
             }
+
+            const b2 = (unhex(b) * 16) + unhex(this.ctx.getByte());
+            pctx.putByte(b2);
         }
 
         return pctx.buffer();
@@ -560,7 +600,7 @@ class CponReader {
             b = this.ctx.getByte();
         }
 
-        let mantisa = Number(this.readInt());
+        let mantisa = this.readInt();
         b = this.ctx.peekByte();
         (() => {
             while (true) {
@@ -575,7 +615,7 @@ class CponReader {
                         isDecimal = true;
                         this.ctx.getByte();
                         const ix1 = this.ctx.index;
-                        decimals = Number(this.readInt());
+                        decimals = this.readInt();
                         // if(n < 0)
                         //  UNPACK_ERROR(CCPCP_RC_MALFORMED_INPUT, "Malformed number decimal part.")
                         decCnt = this.ctx.index - ix1;
@@ -592,7 +632,7 @@ class CponReader {
                         isDecimal = true;
                         this.ctx.getByte();
                         const ix1 = this.ctx.index;
-                        exponent = Number(this.readInt());
+                        exponent = this.readInt();
                         if (ix1 === this.ctx.index) {
                             throw new TypeError('Malformed number exponential part.');
                         }
@@ -622,46 +662,6 @@ class CponReader {
 
         return isNeg ? -mantisa : mantisa;
     }
-
-    private implReadMap(mapType: 'map', terminator: number): ShvMap;
-    private implReadMap(mapType: 'imap', terminator: number): IMap;
-    private implReadMap(mapType: 'metamap', terminator: number): MetaMap;
-    private implReadMap(mapType: 'map' | 'imap' | 'metamap', terminator: number) {
-        const map: MetaMap | ShvMap | IMap = {
-            [shvMapType]: mapType,
-        };
-        this.ctx.getByte(); // eat start
-        while (true) {
-            this.skipWhitespace();
-            const b = this.ctx.peekByte();
-            if (b === terminator) {
-                this.ctx.getByte();
-                break;
-            }
-
-            const key = this.read();
-            if (key instanceof RpcValueWithMetaData) {
-                throw new TypeError('Map/IMap/MetaMap key can\'t have its own MetaData');
-            }
-
-            this.skipWhitespace();
-            const val = this.read();
-
-            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
-                map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || typeof key === 'number')) {
-                map[Number(key)] = val;
-            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
-                map[key] = val;
-            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || typeof key === 'number')) {
-                map[Number(key)] = val;
-            } else {
-                throw new TypeError('Malformed map, invalid key');
-            }
-        }
-
-        return map;
-    }
 }
 
 class CponWriter {
@@ -670,6 +670,41 @@ class CponWriter {
 
     constructor(private readonly indentString?: string, private readonly oneLiners: OneLiners = OneLiners.Yes) {
         this.ctx = new PackContext();
+    }
+
+    private doIndentIfNotOneliner(map: MetaMap | ShvMap | IMap | List) {
+        if (this.indentString === undefined || this.isOneLiner(map)) {
+            return;
+        }
+
+        this.ctx.putByte('\n'.codePointAt(0)!);
+        this.ctx.writeStringUtf8(this.indentString.repeat(this.nestLevel));
+    }
+
+    private isOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (this.oneLiners === OneLiners.No) {
+            return false;
+        }
+
+        const keyThreshold = Array.isArray(value) ? 10 : 5;
+
+        if (Array.isArray(value)) {
+            return value.length <= keyThreshold && value.every(x => !Array.isArray(x) && !isShvMap(x) && !isIMap(x));
+        }
+
+        return Object.keys(value).length <= keyThreshold && Object.values(value).every(x => (!Array.isArray(x) && !isShvMap(x) && !isIMap(x)));
+    }
+
+    private increaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (!this.isOneLiner(value)) {
+            this.nestLevel++;
+        }
+    }
+
+    private decreaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
+        if (!this.isOneLiner(value)) {
+            this.nestLevel--;
+        }
     }
 
     write(rpcVal: RpcValue) {
@@ -840,13 +875,13 @@ class CponWriter {
                 const intKey = Number(key);
                 if (Number.isNaN(intKey)) {
                     this.ctx.putByte('"'.codePointAt(0)!);
-                    this.ctx.writeStringUtf8(key.toString());
+                    this.ctx.writeStringUtf8(key);
                     this.ctx.putByte('"'.codePointAt(0)!);
                 } else {
                     this.writeInt(intKey);
                 }
             } else {
-                this.writeJSString(key.toString());
+                this.writeJSString(key);
             }
 
             this.ctx.writeStringUtf8(':');
@@ -883,7 +918,7 @@ class CponWriter {
     }
 
     writeInt(num: Int) {
-        const s = Number(num).toString();
+        const s = num.toString();
         this.ctx.writeStringUtf8(s);
     }
 
@@ -932,39 +967,6 @@ class CponWriter {
 
         for (let i = 0; i < str.length; ++i) {
             this.ctx.putByte(str.codePointAt(i)!);
-        }
-    }
-
-    private doIndentIfNotOneliner(map: MetaMap | ShvMap | IMap | List) {
-        if (this.indentString !== undefined && !this.isOneLiner(map)) {
-            this.ctx.putByte('\n'.codePointAt(0)!);
-            this.ctx.writeStringUtf8(this.indentString.repeat(this.nestLevel));
-        }
-    }
-
-    private isOneLiner(value: MetaMap | ShvMap | IMap | List) {
-        if (this.oneLiners === OneLiners.No) {
-            return false;
-        }
-
-        const keyThreshold = Array.isArray(value) ? 10 : 5;
-
-        if (Array.isArray(value)) {
-            return value.length <= keyThreshold && !(value.some(x => Array.isArray(x) || isShvMap(x) || isIMap(x)));
-        }
-
-        return Object.keys(value).length <= keyThreshold && !(Object.values(value).some(x => Array.isArray(x) || isShvMap(x) || isIMap(x)));
-    }
-
-    private increaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
-        if (!this.isOneLiner(value)) {
-            this.nestLevel++;
-        }
-    }
-
-    private decreaseIndentIfNotOneLiner(value: MetaMap | ShvMap | IMap | List) {
-        if (!this.isOneLiner(value)) {
-            this.nestLevel--;
         }
     }
 }

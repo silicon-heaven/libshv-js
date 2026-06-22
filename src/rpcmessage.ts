@@ -87,6 +87,6 @@ const implRpcMessage = (message: unknown): message is RpcMessage => typeof messa
     && typeof message.meta === 'object'
     && message.meta !== null;
 
-export const isSignal = (message: unknown): message is RpcSignal => implRpcMessage(message) && !(RPC_MESSAGE_REQUEST_ID in message.meta) && RPC_MESSAGE_METHOD in message.meta;
-export const isRequest = (message: unknown): message is RpcRequest => implRpcMessage(message) && RPC_MESSAGE_REQUEST_ID in message.meta && RPC_MESSAGE_METHOD in message.meta;
-export const isResponse = (message: unknown): message is RpcResponse => implRpcMessage(message) && RPC_MESSAGE_REQUEST_ID in message.meta && !(RPC_MESSAGE_METHOD in message.meta);
+export const isSignal = (message: unknown): message is RpcSignal => implRpcMessage(message) && !Object.hasOwn(message.meta, RPC_MESSAGE_REQUEST_ID) && Object.hasOwn(message.meta, RPC_MESSAGE_METHOD);
+export const isRequest = (message: unknown): message is RpcRequest => implRpcMessage(message) && Object.hasOwn(message.meta, RPC_MESSAGE_REQUEST_ID) && Object.hasOwn(message.meta, RPC_MESSAGE_METHOD);
+export const isResponse = (message: unknown): message is RpcResponse => implRpcMessage(message) && Object.hasOwn(message.meta, RPC_MESSAGE_REQUEST_ID) && !Object.hasOwn(message.meta, RPC_MESSAGE_METHOD);

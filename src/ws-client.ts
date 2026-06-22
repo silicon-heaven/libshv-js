@@ -100,6 +100,7 @@ export type WsClientOptionsLogin<MethodHandlerType = MethodHandler> = WsClientOp
     onDisconnected: () => void;
     onRequest: (shvPath: string) => {
         ls: (shvPath: string) => string[] | Promise<string[]>;
+        // eslint-disable-next-line unicorn/prefer-type-literal-last -- for some reason, it doesn't work when swapped
         dirEntries: Array<{entry: DirEntry} & MethodHandlerType>;
     } | undefined;
 };
@@ -189,7 +190,7 @@ export const UserIDRequired = createErrorClass(ErrorCode.UserIDRequired);
 export const NotImplemented = createErrorClass(ErrorCode.NotImplemented);
 /* eslint-enable @typescript-eslint/naming-convention */
 
-const makeTimeout = (ms: number, resolve: RpcResponseResolver) => globalThis.setTimeout(() => {
+const makeTimeout = (ms: number, resolve: RpcResponseResolver) => setTimeout(() => {
     resolve(new MethodCallTimeout(makeIMap({
         [ERROR_CODE]: ErrorCode.MethodCallTimeout,
         [ERROR_MESSAGE]: `Shv call timeout after: ${ms} msec.`,
@@ -255,168 +256,173 @@ class WsClient {
 
         // eslint-disable-next-line complexity
         const handleRequest = async (request: RpcRequest) => {
-            if ('onRequest' in this.options) {
-                const requestId = request.meta[RPC_MESSAGE_REQUEST_ID];
-                const respond = (value: RpcResponseValue) => {
-                    this.sendRpcMessage(new RpcValueWithMetaData(
-                        makeMetaMap({
-                            [RPC_MESSAGE_CALLER_IDS]: request.meta[RPC_MESSAGE_CALLER_IDS],
-                            [RPC_MESSAGE_REQUEST_ID]: requestId,
-                        }),
-                        value,
-                    ));
+            if (!('onRequest' in this.options)) {
+                return;
+            }
+
+            const requestId = request.meta[RPC_MESSAGE_REQUEST_ID];
+            const respond = (value: RpcResponseValue) => {
+                this.sendRpcMessage(new RpcValueWithMetaData(
+                    makeMetaMap({
+                        [RPC_MESSAGE_CALLER_IDS]: request.meta[RPC_MESSAGE_CALLER_IDS],
+                        [RPC_MESSAGE_REQUEST_ID]: requestId,
+                    }),
+                    value,
+                ));
+            };
+
+            const sendDelay = (progress: number) => {
+                respond(makeIMap({
+                    [RPC_MESSAGE_DELAY]: new Double(progress),
+                }));
+            };
+
+            // eslint-disable-next-line unicorn/no-computed-property-existence-check
+            if (RPC_MESSAGE_ABORT in request.value) {
+                const requestHandler = this.requestHandlers.get(requestId);
+
+                // eslint-disable-next-line unicorn/no-computed-property-existence-check
+                if (request.value[RPC_MESSAGE_ABORT]) {
+                    this.abortedRequests.add(requestId);
+
+                    if (requestHandler?.options.onAbort !== undefined) {
+                        requestHandler.options.onAbort();
+                    }
+                }
+
+                // eslint-disable-next-line unicorn/no-computed-property-existence-check
+                if (!request.value[RPC_MESSAGE_ABORT] && requestHandler?.options.onProgressQuery !== undefined) {
+                    const progress = requestHandler.options.onProgressQuery();
+                    sendDelay(progress instanceof Promise ? await progress : progress);
+                }
+
+                return;
+            }
+
+            try {
+                const shvPath = request.meta[RPC_MESSAGE_SHV_PATH];
+                const methodName = request.meta[RPC_MESSAGE_METHOD];
+                const unhandledMethod = () => {
+                    throw new MethodNotFound(`No such path '${shvPath}' or method '${methodName}' or insufficient access rights.`);
                 };
 
-                const sendDelay = (progress: number) => {
-                    respond(makeIMap({
-                        [RPC_MESSAGE_DELAY]: new Double(progress),
-                    }));
-                };
-
-                if (RPC_MESSAGE_ABORT in request.value) {
-                    const requestHandler = this.requestHandlers.get(requestId);
-
-                    if (request.value[RPC_MESSAGE_ABORT]) {
-                        this.abortedRequests.add(requestId);
-
-                        if (requestHandler?.options.onAbort !== undefined) {
-                            requestHandler.options.onAbort();
-                        }
-                    }
-
-                    if (!request.value[RPC_MESSAGE_ABORT] && requestHandler?.options.onProgressQuery !== undefined) {
-                        const progress = requestHandler.options.onProgressQuery();
-                        sendDelay(progress instanceof Promise ? await progress : progress);
-                    }
-
+                const accessLevel = request.meta[RPC_MESSAGE_ACCESS_LEVEL];
+                if (accessLevel === undefined) {
+                    unhandledMethod();
                     return;
                 }
 
-                try {
-                    const shvPath = request.meta[RPC_MESSAGE_SHV_PATH];
-                    const methodName = request.meta[RPC_MESSAGE_METHOD];
-                    const unhandledMethod = () => {
-                        throw new MethodNotFound(`No such path '${shvPath}' or method '${methodName}' or insufficient access rights.`);
-                    };
+                const methods = this.options.onRequest(shvPath);
+                if (methods === undefined) {
+                    unhandledMethod();
+                    return;
+                }
 
-                    const accessLevel = request.meta[RPC_MESSAGE_ACCESS_LEVEL];
-                    if (accessLevel === undefined) {
-                        unhandledMethod();
-                        return;
-                    }
-
-                    const methods = this.options.onRequest(shvPath);
-                    if (methods === undefined) {
-                        unhandledMethod();
-                        return;
-                    }
-
-                    const methodDefinition = ((): {entry: DirEntry} & MethodHandler | undefined => {
-                        const dirEntry = makeIMap({
-                            [DIR_NAME]: 'dir',
-                            [DIR_FLAGS]: 0,
-                            [DIR_PARAM]: 'DirParam',
-                            [DIR_RESULT]: 'DirResult',
-                            [DIR_ACCESS]: accessLevelFromAccessString('bws'),
-                            [DIR_SIGNALS]: makeMap({}),
-                            [DIR_EXTRA]: makeMap({}),
-                        });
-                        const lsEntry = makeIMap({
-                            [DIR_NAME]: 'ls',
-                            [DIR_FLAGS]: 0,
-                            [DIR_PARAM]: 'LsParam',
-                            [DIR_RESULT]: 'LsResult',
-                            [DIR_ACCESS]: accessLevelFromAccessString('bws'),
-                            [DIR_SIGNALS]: makeMap({}),
-                            [DIR_EXTRA]: makeMap({}),
-                        });
-                        switch (methodName) {
-                            case 'dir':
-                                return {
-                                    entry: dirEntry,
-                                    paramValidator: validateDirParam,
-                                    handler(_shvPath, _method, param) {
-                                        const methodsResult = [dirEntry, lsEntry, ...methods.dirEntries.map(method => method.entry)];
-                                        switch (true) {
-                                            case typeof param === 'string':
-                                                return methodsResult.find(method => method[DIR_NAME] === param) ?? false;
-                                            case typeof param === 'boolean':
-                                            case param === undefined:
-                                                console.log('methodsResult', '=', methodsResult);
-                                                return methodsResult;
-                                        }
-                                    },
-                                };
-                            case 'ls':
-                                return {
-                                    entry: lsEntry,
-                                    paramValidator: validateLsParam,
-                                    handler(shvPath) {
-                                        return methods.ls(shvPath);
-                                    },
-                                };
-                            default:
-                                return methods.dirEntries.find(method => method.entry[DIR_NAME] === methodName);
-                        }
-                    })();
-
-                    if (methodDefinition === undefined) {
-                        unhandledMethod();
-                        return;
-                    }
-
-                    if (accessLevel < methodDefinition.entry[DIR_ACCESS]) {
-                        unhandledMethod();
-                        return;
-                    }
-
-                    const requestParam = request.value[RPC_MESSAGE_PARAMS];
-                    if (methodDefinition.paramValidator !== undefined && !methodDefinition.paramValidator(requestParam)) {
-                        throw new InvalidParams(`Unexpected param '${shvPath}:${methodName}': ${toCpon(requestParam)}`);
-                    }
-
-                    let result = methodDefinition.handler(
-                        shvPath,
-                        methodName,
-                        requestParam,
-                        sendDelay,
-                    );
-                    if (result instanceof RequestHandler) {
-                        this.requestHandlers.set(requestId, result);
-                        result = result.options.result;
-                    }
-
-                    const resultOrError = makeIMap({
-                        [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                const methodDefinition = ((): MethodHandler & {entry: DirEntry} | undefined => {
+                    const dirEntry = makeIMap({
+                        [DIR_NAME]: 'dir',
+                        [DIR_FLAGS]: 0,
+                        [DIR_PARAM]: 'DirParam',
+                        [DIR_RESULT]: 'DirResult',
+                        [DIR_ACCESS]: accessLevelFromAccessString('bws'),
+                        [DIR_SIGNALS]: makeMap({}),
+                        [DIR_EXTRA]: makeMap({}),
                     });
-
-                    if (!this.abortedRequests.has(requestId)) {
-                        respond(resultOrError);
-                    } else {
-                        this.abortedRequests.delete(requestId);
-                    }
-
-                    if (requestId in this.requestHandlers) {
-                        this.requestHandlers.delete(requestId);
-                    }
-                } catch (error: unknown) {
-                    const sendError = (error: RpcError) => {
-                        respond(makeIMap({
-                            [RPC_MESSAGE_ERROR]: error.err_info,
-                        }));
-                    };
-
-                    switch (true) {
-                        case error instanceof RpcError:
-                            sendError(error);
-                            break;
-                        case error instanceof Error:
-                            sendError(new InternalError(error.message));
-                            break;
+                    const lsEntry = makeIMap({
+                        [DIR_NAME]: 'ls',
+                        [DIR_FLAGS]: 0,
+                        [DIR_PARAM]: 'LsParam',
+                        [DIR_RESULT]: 'LsResult',
+                        [DIR_ACCESS]: accessLevelFromAccessString('bws'),
+                        [DIR_SIGNALS]: makeMap({}),
+                        [DIR_EXTRA]: makeMap({}),
+                    });
+                    switch (methodName) {
+                        case 'dir':
+                            return {
+                                entry: dirEntry,
+                                paramValidator: validateDirParam,
+                                handler(_shvPath, _method, param) {
+                                    const methodsResult = [dirEntry, lsEntry, ...methods.dirEntries.map(method => method.entry)];
+                                    switch (true) {
+                                        case typeof param === 'string':
+                                            return methodsResult.find(method => method[DIR_NAME] === param) ?? false;
+                                        case typeof param === 'boolean':
+                                        case param === undefined:
+                                            console.log('methodsResult', '=', methodsResult);
+                                            return methodsResult;
+                                    }
+                                },
+                            };
+                        case 'ls':
+                            return {
+                                entry: lsEntry,
+                                paramValidator: validateLsParam,
+                                handler(shvPath) {
+                                    return methods.ls(shvPath);
+                                },
+                            };
                         default:
-                            sendError(new InternalError('Unknown error'));
-                            break;
+                            return methods.dirEntries.find(method => method.entry[DIR_NAME] === methodName);
                     }
+                })();
+
+                if (methodDefinition === undefined) {
+                    unhandledMethod();
+                    return;
+                }
+
+                if (accessLevel < methodDefinition.entry[DIR_ACCESS]) {
+                    unhandledMethod();
+                    return;
+                }
+
+                const requestParam = request.value[RPC_MESSAGE_PARAMS];
+                if (methodDefinition.paramValidator !== undefined && !methodDefinition.paramValidator(requestParam)) {
+                    throw new InvalidParams(`Unexpected param '${shvPath}:${methodName}': ${toCpon(requestParam)}`);
+                }
+
+                let result = methodDefinition.handler(
+                    shvPath,
+                    methodName,
+                    requestParam,
+                    sendDelay,
+                );
+                if (result instanceof RequestHandler) {
+                    this.requestHandlers.set(requestId, result);
+                    result = result.options.result;
+                }
+
+                const resultOrError = makeIMap({
+                    [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                });
+
+                if (!this.abortedRequests.has(requestId)) {
+                    respond(resultOrError);
+                } else {
+                    this.abortedRequests.delete(requestId);
+                }
+
+                if (this.requestHandlers.has(requestId)) {
+                    this.requestHandlers.delete(requestId);
+                }
+            } catch (error: unknown) {
+                const sendError = (error: RpcError) => {
+                    respond(makeIMap({
+                        [RPC_MESSAGE_ERROR]: error.err_info,
+                    }));
+                };
+
+                switch (true) {
+                    case error instanceof RpcError:
+                        sendError(error);
+                        break;
+                    case error instanceof Error:
+                        sendError(new InternalError(error.message));
+                        break;
+                    default:
+                        sendError(new InternalError('Unknown error'));
+                        break;
                 }
             }
         };
@@ -424,10 +430,11 @@ class WsClient {
         const handleResponse = (response: RpcResponse) => {
             const requestId = response.meta[RPC_MESSAGE_REQUEST_ID];
 
-            if (this.rpcHandlers[Number(requestId)] !== undefined) {
-                const handler = this.rpcHandlers[Number(requestId)];
+            if (this.rpcHandlers[requestId] !== undefined) {
+                const handler = this.rpcHandlers[requestId];
                 clearTimeout(handler.timeout_handle);
 
+                // eslint-disable-next-line unicorn/no-computed-property-existence-check
                 if (RPC_MESSAGE_DELAY in response.value) {
                     if (handler.delayCallback !== undefined) {
                         handler.delayCallback(response.value[RPC_MESSAGE_DELAY].value);
@@ -438,6 +445,7 @@ class WsClient {
                 }
 
                 handler.resolve((() => {
+                    // eslint-disable-next-line unicorn/no-computed-property-existence-check
                     if (RPC_MESSAGE_ERROR in response.value) {
                         const code = response.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
                         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -462,6 +470,7 @@ class WsClient {
                         return new ErrorTypeCtor(response.value[RPC_MESSAGE_ERROR]);
                     }
 
+                    // eslint-disable-next-line unicorn/no-computed-property-existence-check
                     if (RPC_MESSAGE_RESULT in response.value) {
                         return response.value[RPC_MESSAGE_RESULT];
                     }
@@ -476,7 +485,7 @@ class WsClient {
                     }
                 })());
                 // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
-                delete this.rpcHandlers[Number(requestId)];
+                delete this.rpcHandlers[requestId];
             }
         };
 
@@ -509,6 +518,102 @@ class WsClient {
         }
     }
 
+    private workflowsProcedure(options: WsClientOptionsWorkflows) {
+        let workflowsObtained = false;
+        this.websocket.addEventListener('open', () => {
+            this.options.logDebug('CONNECTED');
+            const handleConnectionError = (error: Error) => {
+                this.logDebug('FAILURE: couldn\'t retrieve workflows', error.message);
+                options.onWorkflowsFailed();
+            };
+
+            this.callRpcMethod(undefined, 'workflows').then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                workflowsObtained = true;
+                options.onWorkflows(response);
+
+                this.close();
+            }).catch(() => {
+                options.onWorkflowsFailed();
+            });
+        });
+
+        this.websocket.addEventListener('close', () => {
+            this.logDebug('DISCONNECTED');
+            if (!workflowsObtained) {
+                options.onWorkflowsFailed();
+            }
+        });
+    }
+
+    private loginProcedure(options: WsClientOptionsLogin) {
+        this.websocket.addEventListener('open', () => {
+            this.options.logDebug('CONNECTED');
+            const handleConnectionError = (error: Error) => {
+                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
+                options.onConnectionFailure(error);
+            };
+
+            const handleLoginResponse = (response: unknown) => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                this.logDebug('SUCCESS: connected to shv broker');
+                options.onConnected();
+                this.pingTimerId = setInterval(() => {
+                    this.sendPing();
+                }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
+            };
+
+            const makeLoginParams = (loginMap: ShvMap) => makeMap({
+                login: loginMap,
+                options: makeMap({
+                    device: typeof options.mountPoint === 'string' ? makeMap({mountPoint: options.mountPoint}) : undefined,
+                }),
+            });
+
+            this.callRpcMethod(undefined, 'hello').then(response => {
+                if (response instanceof Error) {
+                    handleConnectionError(response);
+                    return;
+                }
+
+                const makeLoginMap = () => {
+                    switch (options.login.type) {
+                        case 'PLAIN':
+                            return makeMap({
+                                password: options.login.password,
+                                type: options.login.type,
+                                user: options.login.user,
+                            });
+                        case 'TOKEN':
+                            return makeMap({
+                                token: options.login.token,
+                                type: options.login.type,
+                            });
+                    }
+                };
+
+                return this.callRpcMethod(undefined, 'login', makeLoginParams(makeLoginMap()));
+            }).then(handleLoginResponse).catch(() => {
+                this.logDebug('FAILURE: couldn\' connected to shv broker');
+            });
+        });
+
+        this.websocket.addEventListener('close', () => {
+            this.logDebug('DISCONNECTED');
+            this.subscriptions.length = 0;
+            options.onDisconnected();
+            clearInterval(this.pingTimerId);
+        });
+    }
+
     callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<string>>;
     callRpcMethod(shvPath: '.broker/currentClient', method: 'accessLevelForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<number>>;
     callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<DirResult>>;
@@ -521,7 +626,7 @@ class WsClient {
             [RPC_MESSAGE_REQUEST_ID]: rqId,
             [RPC_MESSAGE_METHOD]: method ?? '',
             [RPC_MESSAGE_SHV_PATH]: shvPath ?? '',
-            ...(options?.requestUserId === true ? {[RPC_MESSAGE_USER_ID]: ''} : {}),
+            ...(options?.requestUserId === true && {[RPC_MESSAGE_USER_ID]: ''}),
         }), value);
 
         let rq: RpcRequest = makeRq(makeIMap({
@@ -550,26 +655,28 @@ class WsClient {
     }
 
     sendRpcMessage(rpcMsg: RpcMessage) {
-        if (this.websocket.readyState === WebSocket.OPEN) {
-            this.logDebug('sending rpc message:', toCpon(rpcMsg));
-            const msgData = new Uint8Array(toChainPack(rpcMsg));
-
-            const wr = new ChainPackWriter();
-            wr.writeUIntData(msgData.length + 1);
-            const dgram = new Uint8Array(wr.ctx.length + 1 + msgData.length);
-            let ix = 0;
-            for (let i = 0; i < wr.ctx.length; i++) {
-                dgram[ix++] = wr.ctx.data[i];
-            }
-
-            dgram[ix++] = CHAINPACK_PROTOCOL_TYPE;
-
-            for (const msgDatum of msgData) {
-                dgram[ix++] = msgDatum;
-            }
-
-            this.websocket.send(dgram.buffer);
+        if (this.websocket.readyState !== WebSocket.OPEN) {
+            return;
         }
+
+        this.logDebug('sending rpc message:', toCpon(rpcMsg));
+        const msgData = new Uint8Array(toChainPack(rpcMsg));
+
+        const wr = new ChainPackWriter();
+        wr.writeUIntData(msgData.length + 1);
+        const dgram = new Uint8Array(wr.ctx.length + 1 + msgData.length);
+        let ix = 0;
+        for (let i = 0; i < wr.ctx.length; i++) {
+            dgram[ix++] = wr.ctx.data[i];
+        }
+
+        dgram[ix++] = CHAINPACK_PROTOCOL_TYPE;
+
+        for (const msgDatum of msgData) {
+            dgram[ix++] = msgDatum;
+        }
+
+        this.websocket.send(dgram.buffer);
     }
 
     async getShvApiVersion() {
@@ -593,12 +700,12 @@ class WsClient {
         const path = ri.path();
         const signal = ri.signal();
         if (this.subscriptions.some(val => val.subscriber === subscriber && val.path === path && val.signal === signal)) {
-            this.logDebug(`Already subscribed {$path}:${signal} for subscriber ${subscriber}`);
+            this.logDebug(`Already subscribed ${path}:${signal} for subscriber ${subscriber}`);
             return;
         }
 
         // If this path:signal has not been subscribed on the broker, do it now
-        if (!this.subscriptions.some(val => val.path === path && val.signal === signal)) {
+        if (this.subscriptions.every(val => !(val.path === path && val.signal === signal))) {
             switch (await this.getShvApiVersion()) {
                 case ShvApiVersion.V2: {
                     const result = await this.callRpcMethod('.broker/app', 'subscribe', makeMap({signal, path}));
@@ -696,102 +803,6 @@ class WsClient {
         }
 
         this.options.logDebug(...args);
-    }
-
-    private workflowsProcedure(options: WsClientOptionsWorkflows) {
-        let workflowsObtained = false;
-        this.websocket.addEventListener('open', () => {
-            this.options.logDebug('CONNECTED');
-            const handleConnectionError = (error: Error) => {
-                this.logDebug('FAILURE: couldn\'t retrieve workflows', error.message);
-                options.onWorkflowsFailed();
-            };
-
-            this.callRpcMethod(undefined, 'workflows').then(response => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                workflowsObtained = true;
-                options.onWorkflows(response);
-
-                this.close();
-            }).catch(() => {
-                options.onWorkflowsFailed();
-            });
-        });
-
-        this.websocket.addEventListener('close', () => {
-            this.logDebug('DISCONNECTED');
-            if (!workflowsObtained) {
-                options.onWorkflowsFailed();
-            }
-        });
-    }
-
-    private loginProcedure(options: WsClientOptionsLogin) {
-        this.websocket.addEventListener('open', () => {
-            this.options.logDebug('CONNECTED');
-            const handleConnectionError = (error: Error) => {
-                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
-                options.onConnectionFailure(error);
-            };
-
-            const handleLoginResponse = (response: unknown) => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                this.logDebug('SUCCESS: connected to shv broker');
-                options.onConnected();
-                this.pingTimerId = globalThis.setInterval(() => {
-                    this.sendPing();
-                }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
-            };
-
-            const makeLoginParams = (loginMap: ShvMap) => makeMap({
-                login: loginMap,
-                options: makeMap({
-                    device: typeof options.mountPoint === 'string' ? makeMap({mountPoint: options.mountPoint}) : undefined,
-                }),
-            });
-
-            this.callRpcMethod(undefined, 'hello').then(response => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                const makeLoginMap = () => {
-                    switch (options.login.type) {
-                        case 'PLAIN':
-                            return makeMap({
-                                password: options.login.password,
-                                type: options.login.type,
-                                user: options.login.user,
-                            });
-                        case 'TOKEN':
-                            return makeMap({
-                                token: options.login.token,
-                                type: options.login.type,
-                            });
-                    }
-                };
-
-                return this.callRpcMethod(undefined, 'login', makeLoginParams(makeLoginMap()));
-            }).then(handleLoginResponse).catch(() => {
-                this.logDebug('FAILURE: couldn\' connected to shv broker');
-            });
-        });
-
-        this.websocket.addEventListener('close', () => {
-            this.logDebug('DISCONNECTED');
-            this.subscriptions.length = 0;
-            options.onDisconnected();
-            globalThis.clearInterval(this.pingTimerId);
-        });
     }
 }
 

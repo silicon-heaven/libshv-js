@@ -7,7 +7,7 @@ class UInt<T extends number = number> {
             return;
         }
 
-        if (u < 0 || !Number.isInteger(u)) {
+        if (u < 0 || !Number.isSafeInteger(u)) {
             throw new Error(`Invalid value '${u}' for UInt must a positive integral number`);
         }
 
@@ -19,7 +19,7 @@ class UInt<T extends number = number> {
     }
 
     toString() {
-        return `${this.value.toString()}`;
+        return this.value.toString();
     }
 }
 
@@ -36,7 +36,7 @@ class Decimal {
     exponent: number;
 
     constructor(mantisa: number, exponent: number) {
-        if (!Number.isInteger(exponent)) {
+        if (!Number.isSafeInteger(exponent)) {
             throw new TypeError(`Decimal: exponent must be integral (${exponent})`);
         }
 
