@@ -105,12 +105,13 @@ class ChainPackReader {
 
             const key = this.read();
             const val = this.read();
-            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+            if (
+                (map[shvMapType] === 'metamap' && typeof key === 'string') ||
+                (map[shvMapType] === 'metamap' && typeof key === 'number') ||
+                (map[shvMapType] === 'map' && typeof key === 'string')
+            ) {
                 map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && typeof key === 'number') {
-                map[key] = val;
-            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
-                map[key] = val;
+            // eslint-disable-next-line unicorn/no-duplicate-if-branches -- the type system needs this branch
             } else if (map[shvMapType] === 'imap' && typeof key === 'number') {
                 map[key] = val;
             } else {

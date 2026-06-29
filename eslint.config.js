@@ -88,10 +88,12 @@ export default defineConfig(
             }],
             "no-warning-comments": "off",
             "prefer-promise-reject-errors": "off",
+            "unicorn/consistent-boolean-name": "off",
             "unicorn/consistent-compound-words": "off",
             "unicorn/consistent-function-scoping": "off",
             "unicorn/explicit-length-check": "off",
             "unicorn/filename-case": "off",
+            "unicorn/name-replacements": "off",
             "unicorn/no-break-in-nested-loop": "off",
             "unicorn/no-negated-condition": "off",
             "unicorn/no-useless-undefined": ["error", {
