@@ -100,7 +100,6 @@ export type WsClientOptionsLogin<MethodHandlerType = MethodHandler> = WsClientOp
     onDisconnected: () => void;
     onRequest: (shvPath: string) => {
         ls: (shvPath: string) => string[] | Promise<string[]>;
-        // eslint-disable-next-line unicorn/prefer-type-literal-last -- for some reason, it doesn't work when swapped
         dirEntries: Array<{entry: DirEntry} & MethodHandlerType>;
     } | undefined;
 };
@@ -281,7 +280,6 @@ class WsClient {
             if (RPC_MESSAGE_ABORT in request.value) {
                 const requestHandler = this.requestHandlers.get(requestId);
 
-                // eslint-disable-next-line unicorn/no-computed-property-existence-check
                 if (request.value[RPC_MESSAGE_ABORT]) {
                     this.abortedRequests.add(requestId);
 
@@ -290,7 +288,6 @@ class WsClient {
                     }
                 }
 
-                // eslint-disable-next-line unicorn/no-computed-property-existence-check
                 if (!request.value[RPC_MESSAGE_ABORT] && requestHandler?.options.onProgressQuery !== undefined) {
                     const progress = requestHandler.options.onProgressQuery();
                     sendDelay(progress instanceof Promise ? await progress : progress);
