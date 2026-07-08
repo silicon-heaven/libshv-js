@@ -182,7 +182,7 @@ class ChainPackReader {
             }
 
             case PackingSchema.DateTime: {
-                let bi = this.readUIntDataHelper('UInt');
+                let bi = this.readUIntDataHelper('Int');
                 const hasTzOffset = bi & 1n;
                 const hasNotMsec = bi & 2n;
                 bi >>= 2n;
@@ -210,7 +210,6 @@ class ChainPackReader {
                 }
 
                 msec += SHV_EPOCH_MSEC;
-                msec -= offset * 60_000;
                 return withOffset(new Date(msec), offset ?? undefined);
             }
 
@@ -547,7 +546,7 @@ class ChainPackWriter {
     writeDateTime(dt: DateTime) {
         this.ctx.putByte(PackingSchema.DateTime);
 
-        let msecs = (dt.getTime() + (60_000 * (dt.utc_offset ?? 0))) - SHV_EPOCH_MSEC;
+        let msecs = dt.getTime() - SHV_EPOCH_MSEC;
         if (msecs < 0) {
             throw new RangeError('DateTime prior to 2018-02-02 are not supported in current ChainPack implementation.');
         }
@@ -574,7 +573,7 @@ class ChainPackWriter {
         }
 
         // save as signed int
-        this.writeUIntDataHelper(bi, 'UInt');
+        this.writeUIntDataHelper(bi, 'Int');
     }
 
     writeDouble(double: Double) {
