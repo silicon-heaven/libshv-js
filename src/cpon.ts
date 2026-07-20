@@ -114,13 +114,13 @@ class CponReader {
             this.skipWhitespace();
             const val = this.read();
 
-            if (map[shvMapType] === 'metamap' && typeof key === 'string') {
+            if (typeof key === 'string' && map[shvMapType] === 'metamap') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'metamap' && (key instanceof UInt || typeof key === 'number')) {
+            } else if ((typeof key === 'number' || key instanceof UInt) && map[shvMapType] === 'metamap') {
                 map[Number(key)] = val;
-            } else if (map[shvMapType] === 'map' && typeof key === 'string') {
+            } else if (typeof key === 'string' && map[shvMapType] === 'map') {
                 map[key] = val;
-            } else if (map[shvMapType] === 'imap' && (key instanceof UInt || typeof key === 'number')) {
+            } else if ((typeof key === 'number' || key instanceof UInt) && map[shvMapType] === 'imap') {
                 map[Number(key)] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
@@ -147,7 +147,7 @@ class CponReader {
         b = this.ctx.peekByte();
         // console.log("CHAR:", b, String.fromCodePoint(b));
         // [0-9+-]
-        if ((b >= 48 && b <= 57) || b === 43 || b === 45) {
+        if (b === 43 || b === 45 || (b >= 48 && b <= 57)) {
             return implReturn(this.readNumber());
         }
 
