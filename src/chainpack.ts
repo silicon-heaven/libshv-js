@@ -106,13 +106,13 @@ class ChainPackReader {
             const key = this.read();
             const val = this.read();
             if (
-                (map[shvMapType] === 'metamap' && typeof key === 'string') ||
-                (map[shvMapType] === 'metamap' && typeof key === 'number') ||
-                (map[shvMapType] === 'map' && typeof key === 'string')
+                (typeof key === 'string' && map[shvMapType] === 'metamap') ||
+                (typeof key === 'number' && map[shvMapType] === 'metamap') ||
+                (typeof key === 'string' && map[shvMapType] === 'map')
             ) {
                 map[key] = val;
             // eslint-disable-next-line unicorn/no-duplicate-if-branches -- the type system needs this branch
-            } else if (map[shvMapType] === 'imap' && typeof key === 'number') {
+            } else if (typeof key === 'number' && map[shvMapType] === 'imap') {
                 map[key] = val;
             } else {
                 throw new TypeError('Malformed map, invalid key');
