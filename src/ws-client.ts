@@ -65,7 +65,7 @@ export class RequestHandler {
         onAbort?: () => void;
         onProgressQuery?: () => number | Promise<number>;
     }) {
-        /* nothing */
+        // nothing
     }
 }
 
