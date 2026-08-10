@@ -138,7 +138,7 @@ const makeMap = <T extends Record<string, RpcValue> = Record<string, RpcValue>, 
 
 class RpcValueWithMetaData<MetaSchema extends MetaMap = MetaMap, ValueSchema extends RpcValueType = RpcValueType> {
     constructor(public meta: MetaSchema, public value: ValueSchema) {
-        /* nothing */
+        // nothing
     }
 }
 
