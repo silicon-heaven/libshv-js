@@ -626,9 +626,10 @@ class WsClient {
             ...(options?.requestUserId === true && {[RPC_MESSAGE_USER_ID]: ''}),
         }), value);
 
-        let rq: RpcRequest = makeRq(makeIMap({
+        const paramRaw = params !== undefined ? {
             [RPC_MESSAGE_PARAMS]: params,
-        }));
+        } : {};
+        let rq: RpcRequest = makeRq(makeIMap(paramRaw));
 
         if (options?.beforeSendHook !== undefined) {
             rq = options.beforeSendHook(rq);
