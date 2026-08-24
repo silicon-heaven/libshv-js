@@ -207,6 +207,7 @@ export type CallRpcMethodOptions = {
     delayCallback?: (progress: number) => void;
     requestUserId?: boolean;
     beforeSendHook?: (rpcMessage: RpcRequest) => RpcRequest;
+    explicitNullParam?: boolean;
 };
 
 enum ShvApiVersion {
@@ -626,7 +627,9 @@ class WsClient {
             ...(options?.requestUserId === true && {[RPC_MESSAGE_USER_ID]: ''}),
         }), value);
 
-        const paramRaw = params !== undefined ? {
+        // We will not add an explicit null as a param unless the user requests it. Receivers of RpcCalls should
+        // generally handle a missing param the same as if the param was Null.
+        const paramRaw = params !== undefined || (options?.explicitNullParam ?? false) ? {
             [RPC_MESSAGE_PARAMS]: params,
         } : {};
         let rq: RpcRequest = makeRq(makeIMap(paramRaw));
