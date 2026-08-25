@@ -1,6 +1,6 @@
-import {UnpackContext} from './cpcontext';
-import {CponReader, stringifyDate} from './cpon';
-import {Decimal, Double, isIMap, isShvMap, makeIMap, makeMap, makeMetaMap, RpcValueWithMetaData, UInt, type RpcValue} from './rpcvalue';
+import {UnpackContext} from './cpcontext.js';
+import {CponReader, stringifyDate} from './cpon.js';
+import {Decimal, Double, isIMap, isShvMap, makeIMap, makeMap, makeMetaMap, RpcValueWithMetaData, UInt, type RpcValue} from './rpcvalue.js';
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-types
 const decodeMap = (x: object) => makeMap(Object.fromEntries(Object.entries(x).map(([key, value]) => [key, decodeValueJson(value)])));

@@ -1,9 +1,9 @@
-import {accessLevelFromAccessString} from './access';
-import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack';
-import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon';
-import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, type RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, type RpcSignal, type RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage';
-import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue';
-import {resolveRI, type RIGetter} from './utils';
+import {accessLevelFromAccessString} from './access.js';
+import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack.js';
+import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon.js';
+import {ERROR_MESSAGE, ErrorCode, ERROR_CODE, type RpcMessage, isSignal, isRequest, type RpcRequest, isResponse, ERROR_DATA, type ErrorMap, RPC_MESSAGE_METHOD, RPC_MESSAGE_SHV_PATH, RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_PARAMS, RPC_MESSAGE_ERROR, RPC_MESSAGE_RESULT, RPC_MESSAGE_CALLER_IDS, type RpcResponseValue, RPC_MESSAGE_DELAY, RPC_MESSAGE_ABORT, type RpcSignal, type RpcResponse, RPC_MESSAGE_ACCESS_LEVEL, RPC_MESSAGE_USER_ID} from './rpcmessage.js';
+import {type RpcValue, type Null, type Int, type IMap, type ShvMap, makeMap, makeIMap, RpcValueWithMetaData, makeMetaMap, Double} from './rpcvalue.js';
+import {resolveRI, type RIGetter} from './utils.js';
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
