@@ -1,4 +1,4 @@
-import {type ShvRI} from './shv-ri';
+import {type ShvRI} from './shv-ri.js';
 
 export type StringGetter = string | Promise<string> | (() => string | Promise<string>);
 

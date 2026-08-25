@@ -1,7 +1,7 @@
 /* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing chainpack */
-import {utf8ToString} from './cpon';
-import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue';
-import {UnpackContext, PackContext} from './cpcontext';
+import {utf8ToString} from './cpon.js';
+import {type RpcValue, type RpcValueType, type DateTime, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType} from './rpcvalue.js';
+import {UnpackContext, PackContext} from './cpcontext.js';
 
 enum PackingSchema {
     IntThreshold = 64,
