@@ -1,3 +1,4 @@
+import {minimatch} from 'minimatch';
 import {accessLevelFromAccessString} from './access.js';
 import {ChainPackReader, CHAINPACK_PROTOCOL_TYPE, ChainPackWriter, toChainPack} from './chainpack.js';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon.js';
@@ -210,10 +211,20 @@ export type CallRpcMethodOptions = {
     explicitNullParam?: boolean;
 };
 
-enum ShvApiVersion {
+export enum ShvApiVersion {
     V2,
     V3,
 }
+
+export const pathMatchesSubscription = (subscriptionPath: string, signalPath: string, apiVersion: ShvApiVersion) => {
+    if (apiVersion === ShvApiVersion.V2) {
+        const remainder = signalPath.slice(subscriptionPath.length);
+        return signalPath.startsWith(subscriptionPath) && (remainder.length === 0 || remainder.startsWith('/'));
+    }
+
+    const recursivePathPrefix = subscriptionPath.endsWith('/**') ? subscriptionPath.slice(0, -3) : undefined;
+    return (recursivePathPrefix !== undefined && minimatch(signalPath, recursivePathPrefix)) || minimatch(signalPath, subscriptionPath);
+};
 
 class WsClient {
     private requestId = 1;
@@ -243,12 +254,13 @@ class WsClient {
         this.websocket = new WebSocket(options.wsUri);
         this.websocket.binaryType = 'arraybuffer';
 
-        const handleSignal = (signal: RpcSignal) => {
+        const handleSignal = async (signal: RpcSignal) => {
+            const apiVersion = await this.getShvApiVersion();
             for (const sub of this.subscriptions) {
                 const shvPath = signal.meta[RPC_MESSAGE_SHV_PATH];
                 const signalName = signal.meta[RPC_MESSAGE_METHOD];
 
-                if (shvPath.startsWith(sub.path) && signalName === sub.signal) {
+                if (pathMatchesSubscription(sub.path, shvPath, apiVersion) && signalName === sub.signal) {
                     sub.callback(shvPath, signalName, signal.value[RPC_MESSAGE_PARAMS]);
                 }
             }
@@ -496,7 +508,7 @@ class WsClient {
             this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
             if (isSignal(rpcMsg)) {
-                handleSignal(rpcMsg);
+                await handleSignal(rpcMsg);
             } else if (isRequest(rpcMsg)) {
                 await handleRequest(rpcMsg);
             } else if (isResponse(rpcMsg)) {

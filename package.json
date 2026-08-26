@@ -46,5 +46,8 @@
     "eslint-plugin-unicorn": "^73.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.46.1"
+  },
+  "dependencies": {
+    "minimatch": "^10.2.6"
   }
 }
