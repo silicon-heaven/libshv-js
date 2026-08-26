@@ -1,8 +1,9 @@
 import {toChainPack, fromChainPack} from '../src/chainpack.js';
 import {toCpon, fromCpon} from '../src/cpon.js';
 import {type DateTime} from '../src/rpcvalue.js';
+import {pathMatchesSubscription, ShvApiVersion} from '../src/ws-client.js';
 
-const checkEq = (e1: string | number, e2: string | number) => {
+const checkEq = (e1: string | number | boolean, e2: string | number | boolean) => {
     if (e1 !== e2) {
         throw new Error(`test check error: ${e1} === ${e2}`);
     }
@@ -150,6 +151,22 @@ for (const vector of [
     const c2 = toCpon(v1);
     console.log(c1, 'vs.', c2);
     checkEq(c1, c2);
+}
+
+for (const test of [
+    {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource', expected: true},
+    {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to', signalPath: 'path/to/resource', expected: true},
+    {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource2', expected: false},
+    {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/res', expected: false},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource', expected: true},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/*', signalPath: 'path/to/resource', expected: true},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource2', expected: false},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/res', expected: false},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/c', expected: true},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/c/d/e', expected: true},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/d/e', expected: false},
+]) {
+    checkEq(pathMatchesSubscription(test.subscriptionPath, test.signalPath, test.apiVersion), test.expected);
 }
 
 console.log('PASSED');
