@@ -61,7 +61,7 @@ type RpcResponseMeta = MetaMap<{
 }>;
 
 export type RpcResponseValue = IMap<{
-    [RPC_MESSAGE_RESULT]: RpcValue;
+    [RPC_MESSAGE_RESULT]?: RpcValue;
 }> | IMap<{
     [RPC_MESSAGE_ERROR]: ErrorMap;
 }> | IMap<{
