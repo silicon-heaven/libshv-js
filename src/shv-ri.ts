@@ -22,7 +22,9 @@ export class ShvRI {
 
         this.ri = ri;
         this.methodSepIx = methodSepIx;
-        this.signalSepIx = signalSepIx;
+        if (signalSepIx !== undefined) {
+            this.signalSepIx = signalSepIx;
+        }
 
         const method = this.method();
         if (method.length === 0) {

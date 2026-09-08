@@ -50,7 +50,7 @@ export type Bool = boolean;
 export type Blob = ArrayBuffer;
 export type ShvString = string;
 export type DateTime = Date & {utc_offset?: number};
-const withOffset = (date: Date, utcOffset?: number) => {
+const withOffset = (date: Date, utcOffset: number) => {
     const clonedDate: DateTime = new Date(date);
     clonedDate.utc_offset = utcOffset;
     return clonedDate;
