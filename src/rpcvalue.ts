@@ -60,17 +60,11 @@ export type List = RpcValue[];
 
 const shvMapType = Symbol('shvMapType');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- I can't get rid of this yet
-type IMap<T extends Record<number, RpcValue> = Record<number, any>> = {
-    [Key in keyof T]: T[Key];
-} & {
+type IMap<T extends Record<number, RpcValue> = Record<number, RpcValue>> = T & {
     [shvMapType]: 'imap';
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- I can't get rid of this yet
-type ShvMap<T extends Record<string, RpcValue> = Record<string, any>> = {
-    [Key in keyof T]: T[Key];
-} & {
+type ShvMap<T extends Record<string, RpcValue> = Record<string, RpcValue>> = T & {
     [shvMapType]: 'map';
 };
 
@@ -87,8 +81,14 @@ export type RpcValueType =
     ShvString |
     DateTime |
     List |
-    ShvMap |
-    IMap;
+    {
+        [key: string]: RpcValue;
+        [shvMapType]: 'map';
+    } |
+    {
+        [key: string | number]: RpcValue;
+        [shvMapType]: 'imap';
+    };
 
 type MetaMap<T extends Record<string | number, RpcValue> = Record<string | number, RpcValue>> = {
     [Key in keyof T]: T[Key];
