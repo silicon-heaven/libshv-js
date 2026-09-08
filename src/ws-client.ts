@@ -656,7 +656,7 @@ class WsClient {
             this.rpcHandlers[rqId] = {
                 resolve,
                 timeout_handle: makeTimeout(this.timeout, resolve),
-                ...(options?.delayCallback !== undefined ? {delayCallback: options.delayCallback} : {})
+                ...(options?.delayCallback !== undefined && {delayCallback: options.delayCallback}),
             };
         }, () => {
             this.sendRpcMessage(makeRq(makeIMap({
