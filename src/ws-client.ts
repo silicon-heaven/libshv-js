@@ -653,7 +653,11 @@ class WsClient {
         this.sendRpcMessage(rq);
 
         const promise = new RpcRequestPromise<ResultOrError>(resolve => {
-            this.rpcHandlers[rqId] = {resolve, timeout_handle: makeTimeout(this.timeout, resolve), delayCallback: options?.delayCallback};
+            this.rpcHandlers[rqId] = {
+                resolve,
+                timeout_handle: makeTimeout(this.timeout, resolve),
+                ...(options?.delayCallback !== undefined && {delayCallback: options.delayCallback}),
+            };
         }, () => {
             this.sendRpcMessage(makeRq(makeIMap({
                 [RPC_MESSAGE_ABORT]: true,
