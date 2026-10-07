@@ -543,11 +543,7 @@ class CponReader {
                     neg = true;
                 }
             } else if (b === 120) { // 'x'
-                if (n === 1 && val !== 0) {
-                    break;
-                }
-
-                if (n !== 1) {
+                if (n !== 1 || (n === 1 && val !== 0)) {
                     break;
                 }
 
