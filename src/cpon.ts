@@ -244,11 +244,13 @@ class CponReader {
                             // multiline_comment_entered;
                             while (true) {
                                 b = this.ctx.getByte();
-                                if (b === STAR) {
-                                    b = this.ctx.getByte();
-                                    if (b === SLASH) {
-                                        break;
-                                    }
+                                if (b !== STAR) {
+                                    continue;
+                                }
+
+                                b = this.ctx.getByte();
+                                if (b === SLASH) {
+                                    break;
                                 }
                             }
                         } else if (b === SLASH) {
