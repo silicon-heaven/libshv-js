@@ -440,63 +440,65 @@ class WsClient {
         const handleResponse = (response: RpcResponse) => {
             const requestId = response.meta[RPC_MESSAGE_REQUEST_ID];
 
-            if (this.rpcHandlers[requestId] !== undefined) {
-                const handler = this.rpcHandlers[requestId];
-                clearTimeout(handler.timeout_handle);
+            if (this.rpcHandlers[requestId] === undefined) {
+                return;
+            }
 
-                // eslint-disable-next-line unicorn/no-computed-property-existence-check
-                if (RPC_MESSAGE_DELAY in response.value) {
-                    if (handler.delayCallback !== undefined) {
-                        handler.delayCallback(response.value[RPC_MESSAGE_DELAY].value);
-                    }
+            const handler = this.rpcHandlers[requestId];
+            clearTimeout(handler.timeout_handle);
 
-                    handler.timeout_handle = makeTimeout(this.timeout, handler.resolve);
-                    return;
+            // eslint-disable-next-line unicorn/no-computed-property-existence-check
+            if (RPC_MESSAGE_DELAY in response.value) {
+                if (handler.delayCallback !== undefined) {
+                    handler.delayCallback(response.value[RPC_MESSAGE_DELAY].value);
                 }
 
-                handler.resolve((() => {
-                    // eslint-disable-next-line unicorn/no-computed-property-existence-check
-                    if (RPC_MESSAGE_ERROR in response.value) {
-                        const code = response.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
-                        // eslint-disable-next-line @typescript-eslint/naming-convention
-                        const ErrorTypeCtor = (() => {
-                            switch (code) {
-                                case ErrorCode.InvalidRequest: return InvalidRequest;
-                                case ErrorCode.MethodNotFound: return MethodNotFound;
-                                case ErrorCode.InvalidParams: return InvalidParams;
-                                case ErrorCode.InternalError: return InternalError;
-                                case ErrorCode.ParseError: return ParseError;
-                                case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
-                                case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
-                                case ErrorCode.MethodCallException: return MethodCallException;
-                                case ErrorCode.Unknown: return Unknown;
-                                case ErrorCode.LoginRequired: return LoginRequired;
-                                case ErrorCode.UserIDRequired: return UserIDRequired;
-                                case ErrorCode.NotImplemented: return NotImplemented;
-                                default: return Unknown;
-                            }
-                        })();
-
-                        return new ErrorTypeCtor(response.value[RPC_MESSAGE_ERROR]);
-                    }
-
-                    // eslint-disable-next-line unicorn/no-computed-property-existence-check
-                    if (RPC_MESSAGE_RESULT in response.value) {
-                        return response.value[RPC_MESSAGE_RESULT];
-                    }
-
-                    // At this point, the RpcResponse either has:
-                    // - no keys, which means that the response has an implicit Null result.
-                    // - has some unknown keys, in which case we will produce an error for the client.
-                    // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
-                    const rpcMessageKeys = Object.keys(response.value);
-                    if (rpcMessageKeys.length !== 0) {
-                        return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
-                    }
-                })());
-                // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
-                delete this.rpcHandlers[requestId];
+                handler.timeout_handle = makeTimeout(this.timeout, handler.resolve);
+                return;
             }
+
+            handler.resolve((() => {
+                // eslint-disable-next-line unicorn/no-computed-property-existence-check
+                if (RPC_MESSAGE_ERROR in response.value) {
+                    const code = response.value[RPC_MESSAGE_ERROR][ERROR_CODE] as unknown;
+                    // eslint-disable-next-line @typescript-eslint/naming-convention
+                    const ErrorTypeCtor = (() => {
+                        switch (code) {
+                            case ErrorCode.InvalidRequest: return InvalidRequest;
+                            case ErrorCode.MethodNotFound: return MethodNotFound;
+                            case ErrorCode.InvalidParams: return InvalidParams;
+                            case ErrorCode.InternalError: return InternalError;
+                            case ErrorCode.ParseError: return ParseError;
+                            case ErrorCode.MethodCallTimeout: return MethodCallTimeout;
+                            case ErrorCode.MethodCallCancelled: return MethodCallCancelled;
+                            case ErrorCode.MethodCallException: return MethodCallException;
+                            case ErrorCode.Unknown: return Unknown;
+                            case ErrorCode.LoginRequired: return LoginRequired;
+                            case ErrorCode.UserIDRequired: return UserIDRequired;
+                            case ErrorCode.NotImplemented: return NotImplemented;
+                            default: return Unknown;
+                        }
+                    })();
+
+                    return new ErrorTypeCtor(response.value[RPC_MESSAGE_ERROR]);
+                }
+
+                // eslint-disable-next-line unicorn/no-computed-property-existence-check
+                if (RPC_MESSAGE_RESULT in response.value) {
+                    return response.value[RPC_MESSAGE_RESULT];
+                }
+
+                // At this point, the RpcResponse either has:
+                // - no keys, which means that the response has an implicit Null result.
+                // - has some unknown keys, in which case we will produce an error for the client.
+                // https://silicon-heaven.github.io/shv-doc/rpcmessage.html#response
+                const rpcMessageKeys = Object.keys(response.value);
+                if (rpcMessageKeys.length !== 0) {
+                    return new NotImplemented(`Got an RpcResponse with unsupported keys: ${rpcMessageKeys.join(' ')}`);
+                }
+            })());
+            // eslint-disable-next-line @typescript-eslint/no-array-delete, @typescript-eslint/no-dynamic-delete
+            delete this.rpcHandlers[requestId];
         };
 
         // eslint-disable-next-line @typescript-eslint/strict-void-return
