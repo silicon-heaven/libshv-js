@@ -242,6 +242,7 @@ class WsClient {
     private readonly options: WsClientOptions<MethodHandler>;
     private readonly timeout: number;
     private shvApiVersion: ShvApiVersion | undefined = undefined;
+    private pendingWebSocketData = new Uint8Array(0);
 
     constructor(options: WsClientOptions<MethodHandler>) {
         if (typeof options !== 'object') {
@@ -503,19 +504,26 @@ class WsClient {
 
         // eslint-disable-next-line @typescript-eslint/strict-void-return
         this.websocket.addEventListener('message', async (evt: MessageEvent<ArrayBuffer>) => {
-            const rpcVal = dataToRpcValue(evt.data);
-            const parseMessage = this.options.parseMessage ?? defaultParseMessage;
-            const rpcMsg = parseMessage(rpcVal);
+            const incomingData = new Uint8Array(evt.data);
+            this.pendingWebSocketData = Uint8Array.from([...this.pendingWebSocketData, ...incomingData]);
+            const pendingHandlers: Array<Promise<void>> = [];
 
-            this.logDebug(`message received: ${toCpon(rpcMsg)}`);
+            for (const datagram of this.extractWebSocketDatagrams()) {
+                const rpcVal = dataToRpcValue(datagram);
+                const parseMessage = this.options.parseMessage ?? defaultParseMessage;
+                const rpcMsg = parseMessage(rpcVal);
+                this.logDebug(`message received: ${toCpon(rpcMsg)}`);
 
-            if (isSignal(rpcMsg)) {
-                await handleSignal(rpcMsg);
-            } else if (isRequest(rpcMsg)) {
-                await handleRequest(rpcMsg);
-            } else if (isResponse(rpcMsg)) {
-                handleResponse(rpcMsg);
+                if (isSignal(rpcMsg)) {
+                    pendingHandlers.push(handleSignal(rpcMsg));
+                } else if (isRequest(rpcMsg)) {
+                    pendingHandlers.push(handleRequest(rpcMsg));
+                } else if (isResponse(rpcMsg)) {
+                    handleResponse(rpcMsg);
+                }
             }
+
+            await Promise.all(pendingHandlers);
         });
 
         this.websocket.addEventListener('error', evt => {
@@ -528,6 +536,37 @@ class WsClient {
         } else {
             this.loginProcedure(this.options);
         }
+    }
+
+    private extractWebSocketDatagrams() {
+        const datagrams: ArrayBuffer[] = [];
+        let offset = 0;
+
+        while (offset < this.pendingWebSocketData.length) {
+            const reader = new ChainPackReader(this.pendingWebSocketData.slice(offset).buffer);
+            let length: number;
+            try {
+                length = reader.readUIntData();
+            } catch (error) {
+                if (error instanceof RangeError) {
+                    break;
+                }
+
+                throw error;
+            }
+
+            const prefixLength = reader.ctx.index;
+            if (this.pendingWebSocketData.length - offset - prefixLength < length) {
+                break;
+            }
+
+            const end = offset + prefixLength + length;
+            datagrams.push(this.pendingWebSocketData.slice(offset, end).buffer);
+            offset = end;
+        }
+
+        this.pendingWebSocketData = this.pendingWebSocketData.slice(offset);
+        return datagrams;
     }
 
     private workflowsProcedure(options: WsClientOptionsWorkflows) {
