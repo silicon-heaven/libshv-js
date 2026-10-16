@@ -1,4 +1,6 @@
 class UInt<T extends number = number> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
+    declare private readonly uintBrand: undefined;
     readonly value: T;
 
     constructor(u: T | UInt<T>) {
@@ -24,6 +26,8 @@ class UInt<T extends number = number> {
 }
 
 class Double {
+    // eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
+    declare private readonly doubleBrand: undefined;
     readonly value: number;
 
     constructor(u: number) {

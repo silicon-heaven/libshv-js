@@ -1,7 +1,15 @@
 import {toChainPack, fromChainPack} from '../src/chainpack.js';
 import {toCpon, fromCpon} from '../src/cpon.js';
 import {type DateTime} from '../src/rpcvalue.js';
+import {Double, UInt} from '../src/rpcvalue.js';
 import {pathMatchesSubscription, ShvApiVersion} from '../src/ws-client.js';
+
+const uint = new UInt(1);
+const double = new Double(1);
+// @ts-expect-error
+const _doubleFromUInt: Double = uint;
+// @ts-expect-error
+const _uintFromDouble: UInt = double;
 
 const checkEq = (e1: string | number | boolean, e2: string | number | boolean) => {
     if (e1 !== e2) {
