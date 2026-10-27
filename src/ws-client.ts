@@ -527,8 +527,8 @@ class WsClient {
         });
 
         this.websocket.addEventListener('error', evt => {
-            console.log('WebSocket ERROR', evt);
-            this.logDebug('WebSocket ERROR');
+            console.log('Websocket ERROR', evt);
+            this.logDebug('Websocket ERROR');
         });
 
         if ('onWorkflows' in this.options) {
@@ -572,7 +572,7 @@ class WsClient {
     private workflowsProcedure(options: WsClientOptionsWorkflows) {
         let workflowsObtained = false;
         this.websocket.addEventListener('open', () => {
-            this.options.logDebug('CONNECTED');
+            this.options.logDebug('Websocket CONNECTED');
             const handleConnectionError = (error: Error) => {
                 this.logDebug('FAILURE: couldn\'t retrieve workflows', error.message);
                 options.onWorkflowsFailed();
@@ -594,7 +594,7 @@ class WsClient {
         });
 
         this.websocket.addEventListener('close', () => {
-            this.logDebug('DISCONNECTED');
+            this.logDebug('Websocket DISCONNECTED');
             if (!workflowsObtained) {
                 options.onWorkflowsFailed();
             }
@@ -603,24 +603,7 @@ class WsClient {
 
     private loginProcedure(options: WsClientOptionsLogin) {
         this.websocket.addEventListener('open', () => {
-            this.options.logDebug('CONNECTED');
-            const handleConnectionError = (error: Error) => {
-                this.logDebug('FAILURE: couldn\'t perform initial handshake', error.message);
-                options.onConnectionFailure(error);
-            };
-
-            const handleLoginResponse = (response: unknown) => {
-                if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
-                }
-
-                this.logDebug('SUCCESS: connected to shv broker');
-                options.onConnected();
-                this.pingTimerId = setInterval(() => {
-                    this.sendPing();
-                }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
-            };
+            this.options.logDebug('Websocket CONNECTED');
 
             const makeLoginParams = (loginMap: ShvMap) => makeMap({
                 login: loginMap,
@@ -631,8 +614,7 @@ class WsClient {
 
             this.callRpcMethod(undefined, 'hello').then(response => {
                 if (response instanceof Error) {
-                    handleConnectionError(response);
-                    return;
+                    return response;
                 }
 
                 const makeLoginMap = () => {
@@ -652,13 +634,25 @@ class WsClient {
                 };
 
                 return this.callRpcMethod(undefined, 'login', makeLoginParams(makeLoginMap()));
-            }).then(handleLoginResponse).catch(() => {
+            }).then(response => {
+                if (response instanceof Error) {
+                    this.logDebug('FAILURE: couldn\'t perform initial handshake:', response.message);
+                    options.onConnectionFailure(response);
+                    return;
+                }
+
+                this.logDebug('SUCCESS: connected to shv broker');
+                options.onConnected();
+                this.pingTimerId = setInterval(() => {
+                    this.sendPing();
+                }, options.pingInterval ?? DEFAULT_PING_INTERVAL);
+            }).catch(() => {
                 this.logDebug('FAILURE: couldn\' connected to shv broker');
             });
         });
 
         this.websocket.addEventListener('close', () => {
-            this.logDebug('DISCONNECTED');
+            this.logDebug('Websocket DISCONNECTED');
             this.subscriptions.length = 0;
             options.onDisconnected();
             clearInterval(this.pingTimerId);
