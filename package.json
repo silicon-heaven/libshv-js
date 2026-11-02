@@ -48,6 +48,6 @@
     "typescript-eslint": "^8.46.1"
   },
   "dependencies": {
-    "minimatch": "^10.2.6"
+    "minimatch": "^11.0.3"
   }
 }
