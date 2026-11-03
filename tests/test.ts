@@ -164,16 +164,19 @@ for (const vector of [
 for (const test of [
     {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource', expected: true},
     {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to', signalPath: 'path/to/resource', expected: true},
+    {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/**', signalPath: 'path/to/resource', expected: true},
     {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource2', expected: false},
     {apiVersion: ShvApiVersion.V2, subscriptionPath: 'path/to/resource', signalPath: 'path/to/res', expected: false},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource', expected: true},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/*', signalPath: 'path/to/resource', expected: true},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource2', expected: false},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/res', expected: false},
+    {apiVersion: ShvApiVersion.V3, subscriptionPath: 'path/to/resource', signalPath: 'path/to/resource/rofl', expected: false},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/c', expected: true},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/c/d/e', expected: true},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/d/e', expected: false},
 ]) {
+    console.log('test.subscriptionPath, test.signalPath', '=', test.subscriptionPath, test.signalPath);
     checkEq(pathMatchesSubscription(test.subscriptionPath, test.signalPath, test.apiVersion), test.expected);
 }
 
