@@ -218,11 +218,15 @@ export enum ShvApiVersion {
 
 export const pathMatchesSubscription = (subscriptionPath: string, signalPath: string, apiVersion: ShvApiVersion) => {
     if (apiVersion === ShvApiVersion.V2) {
+        // SHV2 path matching works as if there were a globstar at the end of the path (i.e. it just checks the prefix).
+        // Users of the library might still add the globstart at the end, so we'll remove it for them, so that they do
+        // not have to worry about this.
         const recursivePathPrefix = subscriptionPath.endsWith('/**') ? subscriptionPath.slice(0, -3) : subscriptionPath;
         const remainder = signalPath.slice(recursivePathPrefix.length);
         return signalPath.startsWith(recursivePathPrefix) && (remainder.length === 0 || remainder.startsWith('/'));
     }
 
+    // SHV3 globstar at the end allows for no fragments at the end, so we'll check both.
     const recursivePathPrefix = subscriptionPath.endsWith('/**') ? subscriptionPath.slice(0, -3) : undefined;
     return (recursivePathPrefix !== undefined && minimatch(signalPath, recursivePathPrefix)) || minimatch(signalPath, subscriptionPath);
 };
