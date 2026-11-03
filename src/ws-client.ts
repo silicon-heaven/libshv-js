@@ -218,8 +218,9 @@ export enum ShvApiVersion {
 
 export const pathMatchesSubscription = (subscriptionPath: string, signalPath: string, apiVersion: ShvApiVersion) => {
     if (apiVersion === ShvApiVersion.V2) {
-        const remainder = signalPath.slice(subscriptionPath.length);
-        return signalPath.startsWith(subscriptionPath) && (remainder.length === 0 || remainder.startsWith('/'));
+        const recursivePathPrefix = subscriptionPath.endsWith('/**') ? subscriptionPath.slice(0, -3) : subscriptionPath;
+        const remainder = signalPath.slice(recursivePathPrefix.length);
+        return signalPath.startsWith(recursivePathPrefix) && (remainder.length === 0 || remainder.startsWith('/'));
     }
 
     const recursivePathPrefix = subscriptionPath.endsWith('/**') ? subscriptionPath.slice(0, -3) : undefined;
