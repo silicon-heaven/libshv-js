@@ -107,4 +107,19 @@ checkEq(v4.getTime(), v1.getTime());
     checkEq(c1, c2);
 }
 
+// ChainPack DateTime stores UTC msec since SHV epoch, offset is metadata only.
+// Reference bytes produced by libshvproto-rs cp2cp.
+for (const [cpon, hex] of [
+    ['d"2026-07-10T10:00:00+02"', '8df11fb9f90023'],
+    ['d"2027-05-03T11:30:12.345+01"', '8df30087e28928f211'],
+    ['d"2019-05-03T11:30:00-07"', '8df104b1bd5193'],
+] as const) {
+    const cpk = toChainPack(fromCpon(cpon));
+    const cpkHex = Array.from(new Uint8Array(cpk), b => b.toString(16).padStart(2, '0')).join('');
+    console.log('testing ChainPack bytes', cpon, '\t-------->\t', cpkHex);
+    checkEq(cpkHex, hex);
+    const bytes = new Uint8Array(hex.match(/../g)!.map(h => Number.parseInt(h, 16)));
+    checkEq(toCpon(fromChainPack(bytes.buffer)), cpon);
+}
+
 console.log('PASSED');
