@@ -68,9 +68,6 @@ export default defineConfig(
             "@typescript-eslint/no-shadow": "off",
             "@typescript-eslint/switch-exhaustiveness-check": "off",
             "capitalized-comments": "off",
-            "@stylistic/object-curly-newline": ["error", {
-                "ImportDeclaration": "never"
-            }],
             "n/file-extension-in-import": "off",
             "promise-function-async": "off",
             "camelcase": "off",
