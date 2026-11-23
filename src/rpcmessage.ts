@@ -1,4 +1,5 @@
-import {type Double,
+import {
+    type Double,
     type IMap,
     type MetaMap,
     type RpcValue,

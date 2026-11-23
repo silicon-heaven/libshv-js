@@ -1,5 +1,6 @@
 /* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing cpon */
-import {type RpcValue,
+import {
+    type RpcValue,
     type RpcValueType,
     type DateTime,
     type List,
@@ -14,7 +15,8 @@ import {type RpcValue,
     withOffset,
     shvMapType,
     isShvMap,
-    isIMap} from './rpcvalue.js';
+    isIMap,
+} from './rpcvalue.js';
 import {PackContext, UnpackContext} from './cpcontext.js';
 
 export const stringifyDate = (dt: DateTime) => {

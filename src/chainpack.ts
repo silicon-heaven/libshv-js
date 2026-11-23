@@ -1,6 +1,7 @@
 /* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing chainpack */
 import {utf8ToString} from './cpon.js';
-import {type RpcValue,
+import {
+    type RpcValue,
     type RpcValueType,
     type DateTime,
     Decimal,
@@ -12,7 +13,8 @@ import {type RpcValue,
     type ShvMap,
     UInt,
     withOffset,
-    shvMapType} from './rpcvalue.js';
+    shvMapType,
+} from './rpcvalue.js';
 import {UnpackContext, PackContext} from './cpcontext.js';
 
 enum PackingSchema {
