@@ -148,4 +148,20 @@ class RpcValueWithMetaData<MetaSchema extends MetaMap = MetaMap, ValueSchema ext
 
 export type RpcValue = RpcValueType | RpcValueWithMetaData;
 
-export {shvMapType, Decimal, Double, type IMap, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, makeMap, makeIMap, makeMetaMap, isIMap, isMetaMap, isShvMap};
+export {
+    shvMapType,
+    Decimal,
+    Double,
+    type IMap,
+    type MetaMap,
+    RpcValueWithMetaData,
+    type ShvMap,
+    UInt,
+    withOffset,
+    makeMap,
+    makeIMap,
+    makeMetaMap,
+    isIMap,
+    isMetaMap,
+    isShvMap,
+};

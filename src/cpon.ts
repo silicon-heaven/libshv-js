@@ -1,5 +1,20 @@
 /* eslint-disable no-bitwise -- we do a lot of bit stuff when parsing cpon */
-import {type RpcValue, type RpcValueType, type DateTime, type List, Decimal, Double, type IMap, type Int, type MetaMap, RpcValueWithMetaData, type ShvMap, UInt, withOffset, shvMapType, isShvMap, isIMap} from './rpcvalue.js';
+import {type RpcValue,
+    type RpcValueType,
+    type DateTime,
+    type List,
+    Decimal,
+    Double,
+    type IMap,
+    type Int,
+    type MetaMap,
+    RpcValueWithMetaData,
+    type ShvMap,
+    UInt,
+    withOffset,
+    shvMapType,
+    isShvMap,
+    isIMap} from './rpcvalue.js';
 import {PackContext, UnpackContext} from './cpcontext.js';
 
 export const stringifyDate = (dt: DateTime) => {
@@ -991,4 +1006,11 @@ const fromCpon = (str: string | Uint8Array) => {
 
 const CPON_PROTOCOL_TYPE = 2;
 
-export {utf8ToString, CponWriter, CponReader, CPON_PROTOCOL_TYPE, toCpon, fromCpon};
+export {
+    utf8ToString,
+    CponWriter,
+    CponReader,
+    CPON_PROTOCOL_TYPE,
+    toCpon,
+    fromCpon,
+};

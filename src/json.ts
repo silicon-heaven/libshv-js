@@ -1,6 +1,16 @@
 import {UnpackContext} from './cpcontext.js';
 import {CponReader, stringifyDate} from './cpon.js';
-import {Decimal, Double, isIMap, isShvMap, makeIMap, makeMap, makeMetaMap, RpcValueWithMetaData, UInt, type RpcValue} from './rpcvalue.js';
+import {Decimal,
+    Double,
+    isIMap,
+    isShvMap,
+    makeIMap,
+    makeMap,
+    makeMetaMap,
+    RpcValueWithMetaData,
+    UInt,
+    type RpcValue,
+} from './rpcvalue.js';
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-types
 const decodeMap = (x: object) => makeMap(Object.fromEntries(Object.entries(x).map(([key, value]) => [key, decodeValueJson(value)])));
@@ -103,7 +113,7 @@ const encodeValueJson = (x: RpcValue): unknown => {
             const res = [JSON_TAG_META, encodeValueJson(makeMap(x.meta))] as const;
             const encoded = encodeValueJson(x.value);
             if (Array.isArray(encoded) && encoded[0] === JSON_TAG_TYPE) {
-                return [...res, ...encoded as unknown[]];
+                return [...res, ...(encoded as unknown[])];
             }
 
             return [...res, encoded];
