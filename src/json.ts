@@ -1,6 +1,7 @@
 import {UnpackContext} from './cpcontext.js';
 import {CponReader, stringifyDate} from './cpon.js';
-import {Decimal,
+import {
+    Decimal,
     Double,
     isIMap,
     isShvMap,

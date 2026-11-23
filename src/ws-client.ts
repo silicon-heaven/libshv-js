@@ -1,11 +1,14 @@
 import {minimatch} from 'minimatch';
 import {accessLevelFromAccessString} from './access.js';
-import {ChainPackReader,
+import {
+    ChainPackReader,
     CHAINPACK_PROTOCOL_TYPE,
     ChainPackWriter,
-    toChainPack} from './chainpack.js';
+    toChainPack,
+} from './chainpack.js';
 import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon.js';
-import {ERROR_MESSAGE,
+import {
+    ERROR_MESSAGE,
     ErrorCode,
     ERROR_CODE,
     type RpcMessage,
@@ -28,8 +31,10 @@ import {ERROR_MESSAGE,
     type RpcSignal,
     type RpcResponse,
     RPC_MESSAGE_ACCESS_LEVEL,
-    RPC_MESSAGE_USER_ID} from './rpcmessage.js';
-import {type RpcValue,
+    RPC_MESSAGE_USER_ID,
+} from './rpcmessage.js';
+import {
+    type RpcValue,
     type Null,
     type Int,
     type IMap,
@@ -38,7 +43,8 @@ import {type RpcValue,
     makeIMap,
     RpcValueWithMetaData,
     makeMetaMap,
-    Double} from './rpcvalue.js';
+    Double,
+} from './rpcvalue.js';
 import {resolveRI, type RIGetter} from './utils.js';
 
 const DEFAULT_TIMEOUT = 5000;
