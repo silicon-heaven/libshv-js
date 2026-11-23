@@ -134,6 +134,7 @@ const encodeValueJson = (x: RpcValue): unknown => {
         case x instanceof Date:
             return [JSON_TAG_TYPE, 'DateTime', stringifyDate(x)];
         case x === undefined:
+            // eslint-disable-next-line unicorn/no-null
             return null;
         case x instanceof Decimal:
         case x instanceof UInt:

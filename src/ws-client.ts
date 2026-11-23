@@ -705,12 +705,14 @@ class WsClient {
         });
     }
 
+    /* eslint-disable unicorn/prefer-options-parameter -- This is fine, we want optional params. There's is also explicitNullParam. */
     callRpcMethod(shvPath: '.broker/currentClient', method: 'accessGrantForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<string>>;
     callRpcMethod(shvPath: '.broker/currentClient', method: 'accessLevelForMethodCall', params: [string, string], options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<number>>;
     callRpcMethod(shvPath: string | undefined, method: 'dir', params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<DirResult>>;
     callRpcMethod(shvPath: string | undefined, method: 'ls', params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError<LsResult>>;
     callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError>;
     callRpcMethod(shvPath: string | undefined, method: string, params?: RpcValue, options?: CallRpcMethodOptions): RpcRequestPromise<ResultOrError> {
+    /* eslint-enable unicorn/prefer-options-parameter */
         const rqId = this.requestId++;
         const makeRq = (value: IMap) => new RpcValueWithMetaData(makeMetaMap({
             [RPC_MESSAGE_CALLER_IDS]: undefined,
