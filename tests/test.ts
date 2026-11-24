@@ -176,7 +176,6 @@ for (const test of [
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/c/d/e', expected: true},
     {apiVersion: ShvApiVersion.V3, subscriptionPath: 'a/*/c/**', signalPath: 'a/x/d/e', expected: false},
 ]) {
-    console.log('test.subscriptionPath, test.signalPath', '=', test.subscriptionPath, test.signalPath);
     checkEq(pathMatchesSubscription(test.subscriptionPath, test.signalPath, test.apiVersion), test.expected);
 }
 
