@@ -871,7 +871,12 @@ class CponWriter {
         this.increaseIndentIfNotOneLiner(map);
         this.doIndentIfNotOneliner(map);
         let first = true;
-        for (const [key, value] of Object.entries<RpcValue>(map)) {
+        const values: Readonly<Record<string, RpcValue>> = map;
+        for (const key in values) {
+            if (!Object.hasOwn(values, key)) {
+                continue;
+            }
+
             if (!first) {
                 this.ctx.putByte(','.codePointAt(0)!);
                 this.doIndentIfNotOneliner(map);
@@ -900,7 +905,7 @@ class CponWriter {
             }
 
             this.ctx.writeStringUtf8(':');
-            this.write(value);
+            this.write(values[key]);
         }
 
         this.decreaseIndentIfNotOneLiner(map);
