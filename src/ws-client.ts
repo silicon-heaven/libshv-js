@@ -6,7 +6,14 @@ import {
     ChainPackWriter,
     toChainPack,
 } from './chainpack.js';
-import {type CponReader, CPON_PROTOCOL_TYPE, toCpon} from './cpon.js';
+import {
+    CponWriter,
+    OneLiners,
+    type CponReader,
+    CPON_PROTOCOL_TYPE,
+    toCpon,
+} from './cpon.js';
+import {PackContext} from './cpcontext.js';
 import {
     ERROR_MESSAGE,
     ErrorCode,
@@ -46,6 +53,38 @@ import {
     Double,
 } from './rpcvalue.js';
 import {resolveRI, type RIGetter} from './utils.js';
+
+const maxLogBytes = 8 * 1024;
+const logLimitReached = new RangeError('CPON log limit reached');
+
+class LogPackContext extends PackContext {
+    override putByte(byte: number) {
+        if (this.length === maxLogBytes) {
+            throw logLimitReached;
+        }
+
+        super.putByte(byte);
+    }
+}
+
+export const formatRpcMessageForLog = (message: RpcMessage, datagramBytes: number, direction: 'received' | 'sent') => {
+    const writer = new CponWriter(undefined, OneLiners.No, new LogPackContext());
+    const decoder = new TextDecoder();
+    try {
+        writer.write(message);
+    } catch (error) {
+        if (error !== logLimitReached) {
+            throw error;
+        }
+
+        const prefix = decoder.decode(writer.ctx.buffer(), {stream: true});
+        const bytesPerMiB = 1024 ** 2;
+        const size = datagramBytes < bytesPerMiB ? `${datagramBytes} B` : `${(datagramBytes / bytesPerMiB).toFixed(1)} MiB`;
+        return `${prefix}… [truncated; ${size} ${direction}]`;
+    }
+
+    return decoder.decode(writer.ctx.buffer());
+};
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_PING_INTERVAL = 30 * 1000;
@@ -558,7 +597,7 @@ class WsClient {
                 const rpcVal = dataToRpcValue(datagram);
                 const parseMessage = this.options.parseMessage ?? defaultParseMessage;
                 const rpcMsg = parseMessage(rpcVal);
-                this.logDebug(`message received: ${toCpon(rpcMsg)}`);
+                this.logDebug(`message received: ${formatRpcMessageForLog(rpcMsg, datagram.byteLength, 'received')}`);
 
                 if (isSignal(rpcMsg)) {
                     pendingHandlers.push(handleSignal(rpcMsg));
@@ -759,7 +798,6 @@ class WsClient {
             return;
         }
 
-        this.logDebug('sending rpc message:', toCpon(rpcMsg));
         const msgData = new Uint8Array(toChainPack(rpcMsg));
 
         const wr = new ChainPackWriter();
@@ -776,6 +814,7 @@ class WsClient {
             dgram[ix++] = msgDatum;
         }
 
+        this.logDebug('sending rpc message:', formatRpcMessageForLog(rpcMsg, dgram.byteLength, 'sent'));
         this.websocket.send(dgram.buffer);
     }
 
