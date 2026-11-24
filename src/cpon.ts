@@ -683,8 +683,8 @@ class CponWriter {
     ctx: PackContext;
     nestLevel = 0;
 
-    constructor(private readonly indentString?: string, private readonly oneLiners: OneLiners = OneLiners.Yes) {
-        this.ctx = new PackContext();
+    constructor(private readonly indentString?: string, private readonly oneLiners: OneLiners = OneLiners.Yes, ctx = new PackContext()) {
+        this.ctx = ctx;
     }
 
     private doIndentIfNotOneliner(map: MetaMap | ShvMap | IMap | List) {
