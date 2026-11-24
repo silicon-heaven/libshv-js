@@ -1,8 +1,9 @@
 import {toChainPack, fromChainPack} from '../src/chainpack.js';
 import {toCpon, fromCpon} from '../src/cpon.js';
-import {type DateTime} from '../src/rpcvalue.js';
+import {RPC_MESSAGE_REQUEST_ID, RPC_MESSAGE_RESULT, type RpcResponse} from '../src/rpcmessage.js';
+import {type DateTime, type RpcValue, makeIMap, makeMap, makeMetaMap, RpcValueWithMetaData} from '../src/rpcvalue.js';
 import {Double, UInt} from '../src/rpcvalue.js';
-import {pathMatchesSubscription, ShvApiVersion} from '../src/ws-client.js';
+import {formatRpcMessageForLog, pathMatchesSubscription, ShvApiVersion} from '../src/ws-client.js';
 
 const uint = new UInt(1);
 const double = new Double(1);
@@ -16,6 +17,33 @@ const checkEq = (e1: string | number | boolean, e2: string | number | boolean) =
         throw new Error(`test check error: ${e1} === ${e2}`);
     }
 };
+
+{
+    const response = (value: RpcValue): RpcResponse => new RpcValueWithMetaData(
+        makeMetaMap({[RPC_MESSAGE_REQUEST_ID]: 1}),
+        makeIMap({[RPC_MESSAGE_RESULT]: value}),
+    );
+    const small = response(['ž', 42]);
+    checkEq(formatRpcMessageForLog(small, 37, 'received'), toCpon(small));
+
+    const stringBytes = 8192 - toCpon(response('x')).length + 1;
+    const exact = response('x'.repeat(stringBytes));
+    checkEq(formatRpcMessageForLog(exact, 8200, 'sent'), toCpon(exact));
+
+    const splitUtf8 = response('x'.repeat(stringBytes + 1) + 'ž');
+    const shortPrefix = toCpon(splitUtf8).split('ž')[0];
+    checkEq(formatRpcMessageForLog(splitUtf8, 8202, 'sent'), `${shortPrefix}… [truncated; 8202 B sent]`);
+
+    const map = makeMap({first: 'x'.repeat(8192)});
+    Object.defineProperty(map, 'unvisited', {
+        enumerable: true,
+        get() {
+            throw new Error('Read past the log preview');
+        },
+    });
+    const prefix = toCpon(response(makeMap({first: map.first}))).slice(0, 8192);
+    checkEq(formatRpcMessageForLog(response(map), 5_669_018, 'received'), `${prefix}… [truncated; 5.4 MiB received]`);
+}
 
 for (const lst of [
     [((2 ** 31) - 1) + 'u', null],
