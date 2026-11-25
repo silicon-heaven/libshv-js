@@ -512,9 +512,6 @@ class WsClient {
                     respond(resultOrError);
                 }
 
-                if (this.requestHandlers.has(requestId)) {
-                    this.requestHandlers.delete(requestId);
-                }
             } catch (error: unknown) {
                 const sendError = (error: RpcError) => {
                     respond(makeIMap({
@@ -532,6 +529,10 @@ class WsClient {
                     default:
                         sendError(new InternalError('Unknown error'));
                         break;
+                }
+            } finally {
+                if (this.requestHandlers.has(requestId)) {
+                    this.requestHandlers.delete(requestId);
                 }
             }
         };
