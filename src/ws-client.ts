@@ -490,7 +490,7 @@ class WsClient {
                 }
 
                 const resultOrError = makeIMap({
-                    [RPC_MESSAGE_RESULT]: result instanceof Promise ? await result : result,
+                    [RPC_MESSAGE_RESULT]: await result,
                 });
 
                 if (!this.abortedRequests.has(requestId)) {
