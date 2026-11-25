@@ -56,6 +56,7 @@ import {resolveRI, type RIGetter} from './utils.js';
 
 const maxLogBytes = 8 * 1024;
 const logLimitReached = new RangeError('CPON log limit reached');
+const requestAborted = Symbol('requestAborted');
 
 class LogPackContext extends PackContext {
     override putByte(byte: number) {
@@ -321,7 +322,7 @@ class WsClient {
     }> = [];
 
     private readonly requestHandlers = new Map<number, RequestHandler>();
-    private readonly abortedRequests = new Set<number>();
+    private readonly requestAborters = new Map<number, () => void>();
     private readonly subscriptions: Subscription[] = [];
     private readonly websocket: WebSocket;
     private readonly options: WsClientOptions<MethodHandler>;
@@ -380,7 +381,12 @@ class WsClient {
                 const requestHandler = this.requestHandlers.get(requestId);
 
                 if (request.value[RPC_MESSAGE_ABORT]) {
-                    this.abortedRequests.add(requestId);
+                    const aborter = this.requestAborters.get(requestId);
+                    if (aborter !== undefined) {
+                        aborter();
+                    } else {
+                        console.warn(`Request ${requestId} aborter not found, maybe it has been aborted already`);
+                    }
 
                     if (requestHandler?.options.onAbort !== undefined) {
                         requestHandler.options.onAbort();
@@ -484,19 +490,26 @@ class WsClient {
                     requestParam,
                     sendDelay,
                 );
+
                 if (result instanceof RequestHandler) {
                     this.requestHandlers.set(requestId, result);
                     result = result.options.result;
                 }
 
-                const resultOrError = makeIMap({
-                    [RPC_MESSAGE_RESULT]: await result,
+                const {promise: abortedPromise, resolve: requestAborter} = Promise.withResolvers<typeof requestAborted>();
+
+                this.requestAborters.set(requestId, () => {
+                    requestAborter(requestAborted);
+                });
+                const resultOrAborted = await Promise.race([result, abortedPromise]).finally(() => {
+                    this.requestAborters.delete(requestId);
                 });
 
-                if (!this.abortedRequests.has(requestId)) {
+                if (resultOrAborted !== requestAborted) {
+                    const resultOrError = makeIMap({
+                        [RPC_MESSAGE_RESULT]: resultOrAborted,
+                    });
                     respond(resultOrError);
-                } else {
-                    this.abortedRequests.delete(requestId);
                 }
 
                 if (this.requestHandlers.has(requestId)) {
